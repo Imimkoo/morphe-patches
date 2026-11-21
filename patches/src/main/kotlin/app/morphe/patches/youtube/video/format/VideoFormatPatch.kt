@@ -103,7 +103,7 @@ val videoFormatPatch = patch(
 internal fun hookAdaptiveFormat(descriptor: String) = adaptiveFormatMethod.get()!!.addInstructions(
     0,
     """
-        invoke-static { p0, p1 }, $descriptor(Ljava/lang/String;Ljava/util/List;)Ljava/util/List;
+        invoke-static/range { p0 .. p1 }, $descriptor(Ljava/lang/String;Ljava/util/List;)Ljava/util/List;
         move-result-object p1
     """
 )
