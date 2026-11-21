@@ -54,16 +54,18 @@ public class VideoCodecPolicyTest {
         TestFormat audio = new TestFormat(AUDIO, 0, 0, 140);
         TestFormat av1_1080 = new TestFormat(AV1_MP4, 1920, 1080, 399);
         TestFormat av1_720 = new TestFormat("video/webm; codecs=\"av01.0.08M.08\"", 1280, 720, 398);
+        TestFormat av1_itag_only = new TestFormat("video/mp4", 1280, 720, 394);
         TestFormat vp9 = new TestFormat(VP9, 1920, 1080, 248);
 
-        List<VideoFormat.FormatInterface> input = List.of(h264, audio, av1_1080, av1_720, vp9);
+        List<VideoFormat.FormatInterface> input = List.of(h264, audio, av1_1080, av1_720, av1_itag_only, vp9);
         List<VideoFormat.FormatInterface> filtered =
                 VideoCodecPolicy.filterAdaptiveFormats("PREFER_AV1", input, true);
 
-        assertEquals(3, filtered.size());
+        assertEquals(4, filtered.size());
         assertSame(audio, filtered.get(0));
         assertSame(av1_1080, filtered.get(1));
         assertSame(av1_720, filtered.get(2));
+        assertSame(av1_itag_only, filtered.get(3));
     }
 
     @Test
@@ -148,6 +150,10 @@ public class VideoCodecPolicyTest {
     @Test
     public void mimeClassificationSeparatesMuxedVideoFromAudioOnly() {
         assertTrue(VideoCodecPolicy.isAv1Mime(AV1_MP4));
+        assertTrue(VideoCodecPolicy.isAv1Itag(394));
+        assertTrue(VideoCodecPolicy.isAv1Itag(571));
+        assertTrue(VideoCodecPolicy.isAv1Itag(701));
+        assertFalse(VideoCodecPolicy.isAv1Itag(248));
         assertTrue(VideoCodecPolicy.isCompetingVideoMime(AVC));
         assertTrue(VideoCodecPolicy.isVideoMime("video/mp4; codecs=\"avc1.640028, mp4a.40.2\""));
         assertFalse(VideoCodecPolicy.isAudioMime("video/mp4; codecs=\"avc1.640028, mp4a.40.2\""));
