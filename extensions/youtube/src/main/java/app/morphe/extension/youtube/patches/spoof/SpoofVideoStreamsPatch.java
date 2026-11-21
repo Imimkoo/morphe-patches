@@ -1,5 +1,6 @@
 package app.morphe.extension.youtube.patches.spoof;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import app.morphe.extension.shared.settings.Setting;
@@ -33,10 +34,34 @@ public class SpoofVideoStreamsPatch {
     public static void setClientOrderToUse() {
         ClientType client = Settings.SPOOF_VIDEO_STREAMS_CLIENT_TYPE.get();
 
-        // Use the Android XR or visionOS client that has AV1 if user settings allow it.
-        // AVC cannot be forced with these clients because they use VP9 and AV1.
-        // VP9 blocks AV1, so the AV1 clients are not used.
         final VideoCodec codec = DisableVideoCodecsPatch.getVideoCodec();
+
+        // This client is documented in ClientType as receiving AV1 streams from YouTube.
+        // Prefer AV1 tries it first and then falls back to the user's selected client.
+        // Force AV1 only uses this client with no fallback clients, so a missing AV1 stream
+        // or unavailable XR sign-in correctly results in playback failure.
+        if (codec == VideoCodec.FORCE_AV1) {
+            app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
+                    List.of(), ClientType.ANDROID_XR_EXPERIMENTAL);
+            return;
+        }
+        if (codec == VideoCodec.PREFER_AV1) {
+            List<ClientType> fallbackClients = new ArrayList<>();
+            if (client != ClientType.ANDROID_XR_EXPERIMENTAL) {
+                fallbackClients.add(client);
+            }
+            if (client != ClientType.TV_SABR) {
+                fallbackClients.add(ClientType.TV_SABR);
+            }
+            if (client != ClientType.ANDROID_CREATOR) {
+                fallbackClients.add(ClientType.ANDROID_CREATOR);
+            }
+            app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
+                    fallbackClients, ClientType.ANDROID_XR_EXPERIMENTAL);
+            return;
+        }
+
+        // Preserve the existing opt-in AV1 client mapping for Default mode.
         if (Settings.SPOOF_VIDEO_STREAMS_AV1.get() && codec == VideoCodec.DEFAULT) {
             if (client == ClientType.ANDROID_VR_DASH) {
                 client = ClientType.ANDROID_XR_DASH;

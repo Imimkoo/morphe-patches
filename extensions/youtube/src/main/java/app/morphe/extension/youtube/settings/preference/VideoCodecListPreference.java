@@ -42,6 +42,14 @@ public class VideoCodecListPreference extends CustomDialogListPreference {
     }
 
     @Override
+    public void setValue(String value) {
+        super.setValue(value);
+        // Stream-client order is normally initialized at application startup.
+        // Rebuild it after this preference persists a new codec mode.
+        app.morphe.extension.youtube.patches.spoof.SpoofVideoStreamsPatch.setClientOrderToUse();
+    }
+
+    @Override
     public void setSummary(@Nullable CharSequence summary) {
         if (VideoCodec.AVC.name().equals(getValue()) && !DisableVideoCodecsPatch.isAvcAvailable()) {
             String note = str("morphe_video_codec_avc_not_available");

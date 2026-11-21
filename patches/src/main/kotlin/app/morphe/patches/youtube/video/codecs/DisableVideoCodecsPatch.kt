@@ -29,7 +29,7 @@ private const val EXTENSION_CLASS =
 
 val disableVideoCodecsPatch = patch(
     name = "Disable video codecs",
-    description = "Adds options to disable or force HDR, and to disable VP9 or AV1 codecs.",
+    description = "Adds options to control HDR and select a video codec, including AV1 preference and AV1-only playback.",
 ) {
     dependsOn(
         sharedExtensionPatch,
