@@ -56,7 +56,7 @@ public class VideoCodecPolicyTest {
     @Test
     public void avcModeRejectsAv1AndVp9() {
         assertFalse(VideoCodecPolicy.allowCodec("AVC", AV1, AV1));
-        assertTrue(VideoCodecPolicy.allowCodec("AVC", VP9, AV1));
+        assertFalse(VideoCodecPolicy.allowCodec("AVC", VP9, AV1));
         assertTrue(VideoCodecPolicy.allowCodec("AVC", AVC, AV1));
         assertFalse(VideoCodecPolicy.allowVP9("AVC"));
     }
