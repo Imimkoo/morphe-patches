@@ -1859,11 +1859,12 @@ Limitations:
 • Uses more internet data than AV1
 
 Prefer AV1
-• Tries the Android XR AV1 stream client first
+• With 'Spoof video streams' enabled, tries the Android XR AV1 client first
 • Falls back to your selected client and other supported clients if AV1 is unavailable
 
 Force AV1 only
-• Uses only the Android XR AV1 stream client, with no fallback clients
+• With 'Spoof video streams' enabled, uses only the Android XR AV1 client
+• Without spoofing, the original YouTube client must provide AV1
 • Rejects every video codec except AV1
 • Playback fails if XR sign-in or an AV1 stream is unavailable
 
