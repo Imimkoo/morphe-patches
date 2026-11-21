@@ -21,6 +21,8 @@ import app.morphe.patches.shared.misc.settings.preference.noTitleUnsortedPrefere
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
 import app.morphe.patches.youtube.misc.settings.PreferenceScreen
 import app.morphe.patches.youtube.misc.settings.settingsPatch
+import app.morphe.patches.youtube.video.format.hookAdaptiveFormat
+import app.morphe.patches.youtube.video.format.videoFormatPatch
 import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 
@@ -29,11 +31,12 @@ private const val EXTENSION_CLASS =
 
 val disableVideoCodecsPatch = patch(
     name = "Disable video codecs",
-    description = "Adds options to disable or force HDR, and to disable VP9 or AV1 codecs.",
+    description = "Adds options to disable or force HDR, and to prefer or force AV1, VP9, or AVC codecs.",
 ) {
     dependsOn(
         sharedExtensionPatch,
-        settingsPatch
+        settingsPatch,
+        videoFormatPatch
     )
 
     compatibleWith(COMPATIBILITY_YOUTUBE)
@@ -49,6 +52,8 @@ val disableVideoCodecsPatch = patch(
                 tag = "app.morphe.extension.youtube.settings.preference.VideoCodecListPreference"
             )
         )
+
+        hookAdaptiveFormat("$EXTENSION_CLASS->filterAdaptiveFormats")
 
         Vp9CapabilityFingerprint.method.addInstructionsWithLabels(
             0,
