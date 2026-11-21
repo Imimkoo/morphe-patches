@@ -1,5 +1,6 @@
 package app.morphe.extension.youtube.patches.spoof;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import app.morphe.extension.shared.settings.Setting;
@@ -45,9 +46,16 @@ public class SpoofVideoStreamsPatch {
             return;
         }
         if (codec == VideoCodec.PREFER_AV1) {
-            List<ClientType> fallbackClients = client == ClientType.ANDROID_XR_EXPERIMENTAL
-                    ? List.of(ClientType.TV_SABR, ClientType.ANDROID_CREATOR)
-                    : List.of(client, ClientType.TV_SABR, ClientType.ANDROID_CREATOR);
+            List<ClientType> fallbackClients = new ArrayList<>();
+            if (client != ClientType.ANDROID_XR_EXPERIMENTAL) {
+                fallbackClients.add(client);
+            }
+            if (client != ClientType.TV_SABR) {
+                fallbackClients.add(ClientType.TV_SABR);
+            }
+            if (client != ClientType.ANDROID_CREATOR) {
+                fallbackClients.add(ClientType.ANDROID_CREATOR);
+            }
             app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
                     fallbackClients, ClientType.ANDROID_XR_EXPERIMENTAL);
             return;
