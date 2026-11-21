@@ -18,6 +18,7 @@ import android.view.Display;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import app.morphe.extension.shared.Logger;
@@ -200,9 +201,16 @@ public class DisableVideoCodecsPatch {
             @NonNull List<VideoFormat.FormatInterface> adaptiveFormats
     ) {
         final VideoCodec codec = getVideoCodec();
-        final boolean decoderAvailable = codec == VideoCodec.PREFER_AV1 && hasAv1Decoder();
+        final boolean decoderAvailable = hasAv1Decoder();
+        List<VideoFormat.FormatInterface> formatsToFilter = adaptiveFormats;
+
+        // Avoid preferring AV1 sizes that no installed AV1 decoder can actually handle.
+        if (decoderAvailable && (codec == VideoCodec.PREFER_AV1 || codec == VideoCodec.FORCE_AV1)) {
+            formatsToFilter = filterUnsupportedAv1Sizes(adaptiveFormats);
+        }
+
         final List<VideoFormat.FormatInterface> filtered = VideoCodecPolicy.filterAdaptiveFormats(
-                codec.name(), adaptiveFormats, decoderAvailable
+                codec.name(), formatsToFilter, decoderAvailable
         );
 
         if (filtered != adaptiveFormats) {
@@ -215,7 +223,7 @@ public class DisableVideoCodecsPatch {
                 String mimeType = format.patch_getMimeType();
                 if (VideoCodecPolicy.isVideoMime(mimeType)) {
                     videoCount++;
-                    if (VideoCodecPolicy.isAv1Mime(mimeType)) {
+                    if (VideoCodecPolicy.isAv1Format(format)) {
                         av1Count++;
                     }
                 }
@@ -227,6 +235,57 @@ public class DisableVideoCodecsPatch {
                     + ", total " + filtered.size());
         }
         return filtered;
+    }
+
+    private static List<VideoFormat.FormatInterface> filterUnsupportedAv1Sizes(
+            @NonNull List<VideoFormat.FormatInterface> formats
+    ) {
+        List<VideoFormat.FormatInterface> result = new ArrayList<>(formats.size());
+        for (VideoFormat.FormatInterface format : formats) {
+            if (format == null || !VideoCodecPolicy.isAv1Format(format)
+                    || isAv1FormatDecodable(format)) {
+                result.add(format);
+            } else {
+                Logger.printDebug(() -> "Skipping unsupported AV1 format: itag="
+                        + format.patch_getItag() + ", size="
+                        + format.patch_getWidth() + "x" + format.patch_getHeight());
+            }
+        }
+        return result;
+    }
+
+    private static boolean isAv1FormatDecodable(VideoFormat.FormatInterface format) {
+        final int width = format.patch_getWidth();
+        final int height = format.patch_getHeight();
+        if (width <= 0 || height <= 0) {
+            return true;
+        }
+
+        try {
+            for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
+                if (info.isEncoder()) {
+                    continue;
+                }
+                for (String type : info.getSupportedTypes()) {
+                    if (!MIMETYPE_VIDEO_AV1.equalsIgnoreCase(type)) {
+                        continue;
+                    }
+                    try {
+                        MediaCodecInfo.CodecCapabilities capabilities = info.getCapabilitiesForType(type);
+                        MediaCodecInfo.VideoCapabilities videoCapabilities = capabilities.getVideoCapabilities();
+                        if (videoCapabilities == null || videoCapabilities.isSizeSupported(width, height)) {
+                            return true;
+                        }
+                    } catch (Exception ignored) {
+                        // Continue checking other AV1 decoders.
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            Logger.printException(() -> "isAv1FormatDecodable failure", ex);
+        }
+
+        return false;
     }
 
     private static boolean hasHardwareAv1Decoder() {
