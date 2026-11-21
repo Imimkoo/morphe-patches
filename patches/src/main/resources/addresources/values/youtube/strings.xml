@@ -1859,14 +1859,16 @@ Limitations:
 • Uses more internet data than AV1
 
 Prefer AV1
-• With 'Spoof video streams' enabled, tries the Android XR AV1 client first
-• Falls back to your selected client and other supported clients if AV1 is unavailable
+• When Android has an AV1 decoder and YouTube returns AV1 formats, removes competing video formats from the player's choices
+• Always keeps audio-only formats and all available AV1 quality levels
+• Tries Android XR and other known AV1-capable clients before normal fallback clients
+• If no AV1 stream or decoder is available, keeps the original formats
 
 Force AV1 only
-• With 'Spoof video streams' enabled, uses only the Android XR AV1 client
-• Without spoofing, the original YouTube client must provide AV1
-• Rejects every video codec except AV1
-• Playback fails if XR sign-in or an AV1 stream is unavailable
+• Tries Android XR and other known AV1-capable clients when 'Spoof video streams' is enabled
+• Removes every non-AV1 video format while preserving audio-only formats
+• Does not fall back to VP9, AVC, or another video codec
+• Playback fails if no AV1 video format can be obtained or decoded
 
 AVC (H.264)
 • Requires \'Android Studio\', \'Android VR\', or \'visionOS\' Spoof video stream client
