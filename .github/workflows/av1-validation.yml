@@ -23,8 +23,12 @@ jobs:
         run: |
           python3 -c "import xml.etree.ElementTree as ET; ET.parse('patches/src/main/resources/addresources/values/youtube/strings.xml'); ET.parse('patches/src/main/resources/addresources/values/youtube/arrays.xml'); print('XML_VALID')"
       - name: Run requested tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew :patches:test :extensions:youtube:testDebugUnitTest :extensions:music:testDebugUnitTest --no-daemon
       - name: Build Android bundle
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew :patches:buildAndroid --no-daemon
       - name: Upload .mpp artifact
         uses: actions/upload-artifact@v4
