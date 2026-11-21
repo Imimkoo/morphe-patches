@@ -41,13 +41,6 @@ public class DisableVideoCodecsPatch {
      */
     private static final String MIMETYPE_VIDEO_AV1 = "video/av01";
 
-    /**
-     * Resolved on first use and not in a static initializer, because the default value of
-     * {@link Settings#VIDEO_CODEC} comes from this class.
-     */
-    @Nullable
-    private static volatile VideoCodec videoCodec;
-
     private static final int[] EMPTY_ARRAY_INT = new int[0];
 
     /**
@@ -188,15 +181,11 @@ public class DisableVideoCodecsPatch {
     }
 
     /**
-     * @return The codec in use, which is VP9 if AVC is selected but cannot be forced.
+     * @return The current codec setting. Read it on every call so changing the setting
+     * takes effect immediately without requiring an app restart.
      */
     public static VideoCodec getVideoCodec() {
-        VideoCodec codec = videoCodec;
-        if (codec == null) {
-            codec = resolveVideoCodec();
-            videoCodec = codec;
-        }
-        return codec;
+        return resolveVideoCodec();
     }
 
     /**
@@ -204,7 +193,7 @@ public class DisableVideoCodecsPatch {
      */
     public static boolean allowVP9() {
         final VideoCodec codec = getVideoCodec();
-        final boolean allowed = codec != VideoCodec.AVC && codec != VideoCodec.FORCE_AV1;
+        final boolean allowed = VideoCodecPolicy.allowVP9(codec.name());
         if (!allowed) {
             Logger.printVerbose(() -> "VP9 not allowed");
         }
@@ -216,9 +205,7 @@ public class DisableVideoCodecsPatch {
      */
     public static boolean allowCodec(String mimeType) {
         final VideoCodec codec = getVideoCodec();
-        final boolean allowed = codec == VideoCodec.FORCE_AV1
-                ? MIMETYPE_VIDEO_AV1.equalsIgnoreCase(mimeType)
-                : !(codec == VideoCodec.VP9 && MIMETYPE_VIDEO_AV1.equalsIgnoreCase(mimeType));
+        final boolean allowed = VideoCodecPolicy.allowCodec(codec.name(), mimeType, MIMETYPE_VIDEO_AV1);
         if (!allowed) {
             Logger.printVerbose(() -> "Codec not allowed: " + mimeType);
         }
