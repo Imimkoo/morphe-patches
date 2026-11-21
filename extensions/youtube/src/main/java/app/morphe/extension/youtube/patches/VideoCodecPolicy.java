@@ -24,6 +24,14 @@ final class VideoCodecPolicy {
         return mimeType != null && mimeType.toLowerCase(Locale.ROOT).contains("av01");
     }
 
+    static boolean isAv1Itag(int itag) {
+        return (itag >= 394 && itag <= 401) || itag == 571 || (itag >= 694 && itag <= 701);
+    }
+
+    static boolean isAv1Format(VideoFormat.FormatInterface format) {
+        return format != null && (isAv1Mime(format.patch_getMimeType()) || isAv1Itag(format.patch_getItag()));
+    }
+
     static boolean isCompetingVideoMime(String mimeType) {
         if (mimeType == null) {
             return false;
@@ -90,7 +98,7 @@ final class VideoCodecPolicy {
         boolean hasAv1Video = false;
         for (VideoFormat.FormatInterface format : formats) {
             String mimeType = format == null ? null : format.patch_getMimeType();
-            if (isVideoMime(mimeType) && isAv1Mime(mimeType)) {
+            if ((isVideoMime(mimeType) || isAv1Format(format)) && isAv1Format(format)) {
                 hasAv1Video = true;
                 break;
             }
@@ -113,8 +121,8 @@ final class VideoCodecPolicy {
             String mimeType = format.patch_getMimeType();
             if (isAudioMime(mimeType)) {
                 filtered.add(format);
-            } else if (isVideoMime(mimeType)) {
-                if (isAv1Mime(mimeType)) {
+            } else if (isVideoMime(mimeType) || isAv1Format(format)) {
+                if (isAv1Format(format)) {
                     filtered.add(format);
                 }
             } else if (!forceAv1) {
