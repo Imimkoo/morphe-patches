@@ -33,6 +33,7 @@ public class SpoofVideoStreamsPatch {
                 || client == ClientType.VISIONOS_1_03
                 || client == ClientType.VISIONOS_1_06_AV1
                 || client == ClientType.TV_SABR
+                || client == ClientType.TV_SABR_WII_U
                 || client == ClientType.TV_SIMPLY;
     }
 
