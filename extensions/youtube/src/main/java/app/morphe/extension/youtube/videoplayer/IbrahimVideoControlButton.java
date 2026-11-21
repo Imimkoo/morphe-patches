@@ -112,7 +112,6 @@ public final class IbrahimVideoControlButton {
             bufferEnabled.setChecked(isBufferEnabled(context));
             content.addView(bufferEnabled);
 
-            final int density = (int) context.getResources().getDisplayMetrics().density;
             final TextView targetLabel = new TextView(context);
             final SeekBar targetBar = new SeekBar(context);
             targetBar.setMax(9);
@@ -125,7 +124,8 @@ public final class IbrahimVideoControlButton {
             final TextView resumeLabel = new TextView(context);
             final SeekBar resumeBar = new SeekBar(context);
             resumeBar.setMax(9);
-            resumeBar.setProgress(Math.max(0, Math.min(9, getResumeSeconds(context))));
+            resumeBar.setMax(Math.max(0, targetBar.getProgress()));
+            resumeBar.setProgress(Math.max(0, Math.min(resumeBar.getMax(), getResumeSeconds(context))));
             resumeLabel.setText("Resume: " + resumeBar.getProgress() + " ثانية");
             content.addView(resumeLabel);
             content.addView(resumeBar, new LinearLayout.LayoutParams(
@@ -234,7 +234,7 @@ public final class IbrahimVideoControlButton {
         }
 
         // The patched load-control decision sees a saturated buffer while throttled.
-        return bufferThrottled ? Long.MAX_VALUE : bufferedUs;
+        return bufferThrottled ? Math.max(bufferedUs, targetUs + 120_000_000L) : bufferedUs;
     }
 
     public static boolean isBufferThrottled() {
