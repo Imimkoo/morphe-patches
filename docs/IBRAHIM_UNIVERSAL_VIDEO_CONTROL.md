@@ -86,22 +86,24 @@ Show values only when they can be measured or reliably obtained; otherwise show 
 
 ## Current status
 
-Implementation has started, but this is **not yet a complete delivery**.
+Implementation is underway. Source now contains an independent codec policy, a separate load-control hook, and a combined in-player settings dialog. This is still not a fully verified release.
 
 ### Implemented in source
-- Added `IbrahimVideoControlButton`, a separate extension class with its own persisted codec-mode preference.
-- Added `Ibrahim: Universal video control` as a separate patch definition and a player-row entry labelled **إبراهيم**.
-- The new patch injects its own codec policy callbacks at the verified VP9 capability and codec MIME-type decision points. It does not call or depend on the upstream codec or buffer extension classes.
-- Modes currently available in this first implementation:
+- Added `IbrahimVideoControlButton` with its own persistent preference namespace.
+- Added a single **إبراهيم** player control and a native dialog containing codec modes, buffer enable/disable, Target and Resume sliders.
+- Added a distinct `Ibrahim: Universal video control` patch and a distinct `Ibrahim: Buffer control` patch.
+- Codec callbacks are injected at the existing VP9 capability and codec MIME decision points, but call only Ibrahim's implementation.
+- Buffer control reads the player's buffered-duration field inside the identified load-control method and applies hysteresis: stop loading at Target, resume only at Resume. It does not call or depend on `PlaybackBufferPatch`.
+- Defaults: Target 3 seconds, Resume 2 seconds.
+- Modes:
   - Default: leave codec decisions unchanged.
-  - Prefer AV1: disables VP9 while leaving other video MIME types available. This is a limited preference, not a guarantee that AV1 outranks AVC.
-  - Force AV1 only: rejects non-AV1 video MIME types while leaving audio codecs untouched.
+  - Prefer AV1: disables VP9 while leaving other video MIME types available. This is a limited preference and cannot guarantee AV1 wins over AVC.
+  - Force AV1 only: rejects non-AV1 video MIME types while preserving audio codec selection.
 
 ### Not implemented / not verified
-- The requested 3-second target / 2-second resume buffer controller is not implemented.
-- The full diagnostics panel (actual codec/profile, FPS, buffer-ahead, byte counts, frame counters) is not implemented.
-- The current popup is a basic native choice dialog, not the final themed bottom sheet.
-- No runtime verification on YouTube 21.30.216 has been performed.
-- The GitHub Actions test/build is running; no MPP artifact has been verified yet.
+- The dialog is currently a native choice/settings dialog, not the final themed bottom sheet requested.
+- Live selected video codec/profile, FPS, exact buffer-ahead, byte counts, frame counters, and diagnostics counters are not yet displayed.
+- No runtime patch application or playback verification against the exact YouTube 21.30.216 APK has been performed.
+- GitHub Actions is compiling/testing the source and will build the MPP only if the test job succeeds. No final MPP artifact has yet been verified.
 
-Do not describe this interim source as the finished Ibrahim feature set. The next gates are compilation, patch application against the exact 21.30.216 APK, implementing the real buffer hook, and verifying the generated MPP artifact.
+A successful source build does not prove that the bytecode hooks apply cleanly to the target APK or that playback behavior is correct. Runtime verification remains a release gate.
