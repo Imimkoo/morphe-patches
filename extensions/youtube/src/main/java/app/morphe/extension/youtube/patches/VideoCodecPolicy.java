@@ -98,7 +98,7 @@ final class VideoCodecPolicy {
         boolean hasAv1Video = false;
         for (VideoFormat.FormatInterface format : formats) {
             String mimeType = format == null ? null : format.patch_getMimeType();
-            if ((isVideoMime(mimeType) || isAv1Format(format)) && isAv1Format(format)) {
+            if (isAv1Format(format) && !isAudioMime(mimeType)) {
                 hasAv1Video = true;
                 break;
             }
