@@ -178,8 +178,9 @@ public class DisableVideoCodecsPatch {
         }
 
         av1DecoderAvailable = available;
-        Logger.printDebug(() -> "AV1 decoder available: " + available);
-        return available;
+        final boolean decoderFound = available;
+        Logger.printDebug(() -> "AV1 decoder available: " + decoderFound);
+        return decoderFound;
     }
 
     /**
@@ -218,8 +219,10 @@ public class DisableVideoCodecsPatch {
                     }
                 }
             }
+            final int loggedVideoCount = videoCount;
+            final int loggedAv1Count = av1Count;
             Logger.printInfo(() -> "AV1 format policy for " + videoId + ": "
-                    + codec + ", video formats " + videoCount + ", AV1 " + av1Count
+                    + codec + ", video formats " + loggedVideoCount + ", AV1 " + loggedAv1Count
                     + ", total " + filtered.size());
         }
         return filtered;
