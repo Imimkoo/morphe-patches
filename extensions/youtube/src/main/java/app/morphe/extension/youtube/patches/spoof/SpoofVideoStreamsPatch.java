@@ -36,7 +36,7 @@ public class SpoofVideoStreamsPatch {
                 || client == ClientType.TV_SIMPLY;
     }
 
-    private static List<ClientType> av1ClientsInOrder(ClientType selected) {
+    static List<ClientType> av1ClientsInOrder(ClientType selected) {
         List<ClientType> clients = new ArrayList<>();
         // Prefer clients that do not require OAuth2 sign-in or a JS/PoToken setup first.
         ClientType[] order = {
@@ -63,6 +63,9 @@ public class SpoofVideoStreamsPatch {
         final VideoCodec codec = DisableVideoCodecsPatch.getVideoCodec();
 
         if (codec == VideoCodec.FORCE_AV1) {
+            app.morphe.extension.shared.spoof.requests.StreamingDataRequest.setAdaptiveFormatValidator(
+                    (formats, client) -> formats.stream().anyMatch(format -> format.getMimeType() != null
+                            && format.getMimeType().toLowerCase(java.util.Locale.ROOT).contains("av01")));
             List<ClientType> av1Clients = av1ClientsInOrder(selected);
             ClientType preferred = av1Clients.remove(0);
             // No non-AV1 clients are included: AV1-only mode never falls back to VP9/AVC.
@@ -71,6 +74,10 @@ public class SpoofVideoStreamsPatch {
         }
 
         if (codec == VideoCodec.PREFER_AV1) {
+            app.morphe.extension.shared.spoof.requests.StreamingDataRequest.setAdaptiveFormatValidator(
+                    (formats, client) -> !isAv1CapableClient(client) || formats.stream().anyMatch(format ->
+                            format.getMimeType() != null
+                                    && format.getMimeType().toLowerCase(java.util.Locale.ROOT).contains("av01")));
             List<ClientType> av1Clients = av1ClientsInOrder(selected);
             ClientType preferred = av1Clients.remove(0);
             List<ClientType> fallbackClients = new ArrayList<>(av1Clients);
@@ -82,6 +89,8 @@ public class SpoofVideoStreamsPatch {
             app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(fallbackClients, preferred);
             return;
         }
+
+        app.morphe.extension.shared.spoof.requests.StreamingDataRequest.setAdaptiveFormatValidator(null);
 
         // Preserve the existing opt-in AV1 client mapping for Default mode.
         ClientType client = selected;
@@ -102,4 +111,4 @@ public class SpoofVideoStreamsPatch {
         List<ClientType> availableClients = List.of(ClientType.TV_SABR, ClientType.ANDROID_CREATOR);
         app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(availableClients, client);
     }
-}}
+}
