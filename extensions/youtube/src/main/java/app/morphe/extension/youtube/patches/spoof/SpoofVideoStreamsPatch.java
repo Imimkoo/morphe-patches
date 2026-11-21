@@ -33,12 +33,28 @@ public class SpoofVideoStreamsPatch {
     public static void setClientOrderToUse() {
         ClientType client = Settings.SPOOF_VIDEO_STREAMS_CLIENT_TYPE.get();
 
-        // Use an AV1-capable Android XR or visionOS client when AV1 is preferred or forced.
-        // AVC cannot be forced with these clients because they use VP9 and AV1.
-        // VP9 blocks AV1, so the AV1 clients are not used.
         final VideoCodec codec = DisableVideoCodecsPatch.getVideoCodec();
-        final boolean preferAv1 = codec == VideoCodec.PREFER_AV1 || codec == VideoCodec.FORCE_AV1;
-        if ((Settings.SPOOF_VIDEO_STREAMS_AV1.get() && codec == VideoCodec.DEFAULT) || preferAv1) {
+
+        // This client is documented in ClientType as receiving AV1 streams from YouTube.
+        // Prefer AV1 tries it first and then falls back to the user's selected client.
+        // Force AV1 only uses this client with no fallback clients, so a missing AV1 stream
+        // or unavailable XR sign-in correctly results in playback failure.
+        if (codec == VideoCodec.FORCE_AV1) {
+            app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
+                    List.of(), ClientType.ANDROID_XR_EXPERIMENTAL);
+            return;
+        }
+        if (codec == VideoCodec.PREFER_AV1) {
+            List<ClientType> fallbackClients = client == ClientType.ANDROID_XR_EXPERIMENTAL
+                    ? List.of(ClientType.TV_SABR, ClientType.ANDROID_CREATOR)
+                    : List.of(client, ClientType.TV_SABR, ClientType.ANDROID_CREATOR);
+            app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
+                    fallbackClients, ClientType.ANDROID_XR_EXPERIMENTAL);
+            return;
+        }
+
+        // Preserve the existing opt-in AV1 client mapping for Default mode.
+        if (Settings.SPOOF_VIDEO_STREAMS_AV1.get() && codec == VideoCodec.DEFAULT) {
             if (client == ClientType.ANDROID_VR_DASH) {
                 client = ClientType.ANDROID_XR_DASH;
             } else if (client == ClientType.ANDROID_VR_SABR) {
