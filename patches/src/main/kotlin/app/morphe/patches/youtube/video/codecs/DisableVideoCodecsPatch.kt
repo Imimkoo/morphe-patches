@@ -21,8 +21,6 @@ import app.morphe.patches.shared.misc.settings.preference.noTitleUnsortedPrefere
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
 import app.morphe.patches.youtube.misc.settings.PreferenceScreen
 import app.morphe.patches.youtube.misc.settings.settingsPatch
-import app.morphe.patches.youtube.video.format.hookAdaptiveFormat
-import app.morphe.patches.youtube.video.format.videoFormatPatch
 import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 
@@ -35,15 +33,12 @@ val disableVideoCodecsPatch = patch(
 ) {
     dependsOn(
         sharedExtensionPatch,
-        settingsPatch,
-        videoFormatPatch,
+        settingsPatch
     )
 
     compatibleWith(COMPATIBILITY_YOUTUBE)
 
     execute {
-        hookAdaptiveFormat("$EXTENSION_CLASS->filterAdaptiveFormats")
-
         PreferenceScreen.VIDEO.addPreferences(
             noTitleUnsortedPreferenceCategory(
                 SwitchPreference("morphe_disable_hdr_video"),
