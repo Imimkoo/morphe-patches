@@ -84,19 +84,25 @@ final class VideoCodecPolicy {
 
         if (!"PREFER_AV1".equals(codec) || decoder == null) return formats;
 
-        boolean hasPlayableAv1 = formats.stream().anyMatch(format -> {
-            FormatDescriptor descriptor = adapter.describe(format);
-            return isVideoMimeType(descriptor.mimeType) && isAv1(descriptor.mimeType)
-                    && decoder.supports(descriptor.width, descriptor.height, descriptor.frameRate);
-        });
+        // Prefer supported AV1 formats by placing them first, but retain every fallback
+        // format. Filtering alternatives here would turn PREFER_AV1 into FORCE_AV1 and
+        // could leave playback with no usable stream if AV1 negotiation later fails.
+        List<T> preferredAv1 = new java.util.ArrayList<>();
+        List<T> fallbackFormats = new java.util.ArrayList<>();
 
-        if (!hasPlayableAv1) return formats;
-
-        return formats.stream().filter(format -> {
+        for (T format : formats) {
             FormatDescriptor descriptor = adapter.describe(format);
-            if (!isVideoMimeType(descriptor.mimeType)) return true;
-            return isAv1(descriptor.mimeType)
-                    && decoder.supports(descriptor.width, descriptor.height, descriptor.frameRate);
-        }).collect(Collectors.toList());
+            if (isVideoMimeType(descriptor.mimeType) && isAv1(descriptor.mimeType)
+                    && decoder.supports(descriptor.width, descriptor.height, descriptor.frameRate)) {
+                preferredAv1.add(format);
+            } else {
+                fallbackFormats.add(format);
+            }
+        }
+
+        if (preferredAv1.isEmpty()) return formats;
+
+        preferredAv1.addAll(fallbackFormats);
+        return preferredAv1;
     }
 }
