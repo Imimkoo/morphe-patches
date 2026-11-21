@@ -6,13 +6,20 @@
 - Working branch: `ibrahim/universal-video-control`
 - Base branch: `dev`
 - Target YouTube APK: `21.30.216`
-- This branch starts from the upstream source; previous experimental AV1 patches and userscripts are not implementation dependencies.
+- This branch starts from the upstream source. Ibrahim controls are a new, independent implementation; existing codec and playback-buffer patches are not dependencies and must not be enabled or reused as the implementation.
 
 ## Product requirement
 
 Add one compact player action named **إبراهيم** beside the existing YouTube video action buttons. Tapping it opens a native in-app popup/bottom sheet. Do not use a floating overlay or a browser userscript.
 
 The panel must expose real controls and live diagnostics for the currently playing video.
+
+## Architecture rule
+
+- Build Ibrahim's codec policy, buffer controller, diagnostics collector, settings and player panel as independent modules owned by this project.
+- Do not call, wrap, depend on, or silently activate the existing upstream `DisableVideoCodecsPatch` or `PlaybackBufferPatch` as the implementation of Ibrahim controls.
+- Inspect upstream code only to understand Android/YouTube APIs, patch injection conventions, and version-specific constraints. New behavior and settings must be implemented under distinct Ibrahim classes and preference keys.
+- Keep the modules isolated behind a small coordinator. A failure in optional diagnostics must never interrupt playback. If a hook cannot be verified for YouTube 21.30.216, disable that control and report it honestly rather than applying a speculative bytecode edit.
 
 ## Controls
 
@@ -49,6 +56,9 @@ Show values only when they can be measured or reliably obtained; otherwise show 
 
 ## UI and persistence
 
+- The main entry point is a single **إبراهيم** action in the video action row directly below the video, alongside Like/Share. It opens one compact scrollable bottom sheet/popup; controls and diagnostics stay inside this panel rather than adding separate player buttons.
+- Organize the panel into clear sections: playback/AV1, buffer, live video information, and diagnostics. Keep the most-used controls at the top.
+
 - Label: **إبراهيم**.
 - Placement: native video action row, next to Like/Share actions.
 - Popup must work in portrait and landscape and follow the app theme.
@@ -76,4 +86,4 @@ Show values only when they can be measured or reliably obtained; otherwise show 
 
 ## Current status
 
-This file records requirements and implementation gates only. It is not evidence that the UI, hooks, codec selection, buffer throttling, tests, patches artifact, or APK have been implemented.
+This file records requirements and implementation gates only. It is not evidence that the UI, hooks, codec selection, buffer controller, tests, patches artifact, or APK have been implemented. The user explicitly chose a new independent Ibrahim implementation rather than reusing existing upstream codec/buffer patches.
