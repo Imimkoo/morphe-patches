@@ -33,11 +33,12 @@ public class SpoofVideoStreamsPatch {
     public static void setClientOrderToUse() {
         ClientType client = Settings.SPOOF_VIDEO_STREAMS_CLIENT_TYPE.get();
 
-        // Use the Android XR or visionOS client that has AV1 if user settings allow it.
+        // Use an AV1-capable Android XR or visionOS client when AV1 is preferred or forced.
         // AVC cannot be forced with these clients because they use VP9 and AV1.
         // VP9 blocks AV1, so the AV1 clients are not used.
         final VideoCodec codec = DisableVideoCodecsPatch.getVideoCodec();
-        if (Settings.SPOOF_VIDEO_STREAMS_AV1.get() && codec == VideoCodec.DEFAULT) {
+        final boolean preferAv1 = codec == VideoCodec.PREFER_AV1 || codec == VideoCodec.FORCE_AV1;
+        if ((Settings.SPOOF_VIDEO_STREAMS_AV1.get() && codec == VideoCodec.DEFAULT) || preferAv1) {
             if (client == ClientType.ANDROID_VR_DASH) {
                 client = ClientType.ANDROID_XR_DASH;
             } else if (client == ClientType.ANDROID_VR_SABR) {
