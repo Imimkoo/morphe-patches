@@ -45,7 +45,6 @@ val videoFormatPatch = patch(
             mapOf(
                 "width" to "patch_getWidth",
                 "height" to "patch_getHeight",
-                "fps" to "patch_getFps",
                 "mimeType" to "patch_getMimeType",
                 "itag" to "patch_getItag"
             ).forEach { (protoFieldName, patchInterfaceMethodName) ->
