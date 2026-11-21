@@ -33,11 +33,12 @@ public final class IbrahimVideoControlButton {
     public static void initializeButton(View controlsView) {
         try {
             appContext = controlsView.getContext().getApplicationContext();
-            PlayerOverlayButton.addButtonWithTextOverlay(
+            TextView button = PlayerOverlayButton.addButtonWithTextOverlay(
                     controlsView,
                     view -> showPanel(view.getContext()),
                     null
-            ).setText("إبراهيم");
+            );
+            if (button != null) button.setText("إبراهيم");
         } catch (Exception ex) {
             Logger.printException(() -> "Ibrahim button initialization failed", ex);
         }
