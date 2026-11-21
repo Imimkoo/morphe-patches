@@ -28,38 +28,56 @@ public class SpoofVideoStreamsPatch {
         }
     }
 
+    private static void addAv1Clients(List<ClientType> clients, ClientType preferred) {
+        for (ClientType candidate : List.of(
+                ClientType.ANDROID_XR_SABR,
+                ClientType.ANDROID_XR_DASH,
+                ClientType.VISIONOS_1_06_AV1,
+                ClientType.VISIONOS_1_03)) {
+            if (candidate != preferred && !clients.contains(candidate)) {
+                clients.add(candidate);
+            }
+        }
+    }
+
+    private static void addFallbackClient(List<ClientType> clients, ClientType candidate, ClientType preferred) {
+        if (candidate != preferred && !clients.contains(candidate)) {
+            clients.add(candidate);
+        }
+    }
+
     /**
      * Injection point.
      */
     public static void setClientOrderToUse() {
-        ClientType client = Settings.SPOOF_VIDEO_STREAMS_CLIENT_TYPE.get();
-
+        ClientType selectedClient = Settings.SPOOF_VIDEO_STREAMS_CLIENT_TYPE.get();
         final VideoCodec codec = DisableVideoCodecsPatch.getVideoCodec();
 
-        // This client is documented in ClientType as receiving AV1 streams from YouTube.
-        // Prefer AV1 tries it first and then falls back to the user's selected client.
-        // Force AV1 only uses this client with no fallback clients, so a missing AV1 stream
-        // or unavailable XR sign-in correctly results in playback failure.
         if (codec == VideoCodec.FORCE_AV1) {
+            // Only AV1-capable clients are attempted. Client fallback is allowed, codec fallback is not.
+            List<ClientType> av1Clients = new ArrayList<>();
+            addAv1Clients(av1Clients, ClientType.ANDROID_XR_EXPERIMENTAL);
             app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
-                    List.of(), ClientType.ANDROID_XR_EXPERIMENTAL);
+                    av1Clients, ClientType.ANDROID_XR_EXPERIMENTAL);
             return;
         }
+
         if (codec == VideoCodec.PREFER_AV1) {
-            List<ClientType> fallbackClients = new ArrayList<>();
-            if (client != ClientType.ANDROID_XR_EXPERIMENTAL) {
-                fallbackClients.add(client);
-            }
-            if (client != ClientType.TV_SABR) {
-                fallbackClients.add(ClientType.TV_SABR);
-            }
-            if (client != ClientType.ANDROID_CREATOR) {
-                fallbackClients.add(ClientType.ANDROID_CREATOR);
-            }
+            // Try server profiles known to return AV1 before any ordinary fallback client.
+            List<ClientType> clients = new ArrayList<>();
+            addAv1Clients(clients, ClientType.ANDROID_XR_EXPERIMENTAL);
+
+            // Preserve the user's selected client and normal fallback order after AV1-capable clients.
+            addFallbackClient(clients, selectedClient, ClientType.ANDROID_XR_EXPERIMENTAL);
+            addFallbackClient(clients, ClientType.TV_SABR, ClientType.ANDROID_XR_EXPERIMENTAL);
+            addFallbackClient(clients, ClientType.ANDROID_CREATOR, ClientType.ANDROID_XR_EXPERIMENTAL);
+
             app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
-                    fallbackClients, ClientType.ANDROID_XR_EXPERIMENTAL);
+                    clients, ClientType.ANDROID_XR_EXPERIMENTAL);
             return;
         }
+
+        ClientType client = selectedClient;
 
         // Preserve the existing opt-in AV1 client mapping for Default mode.
         if (Settings.SPOOF_VIDEO_STREAMS_AV1.get() && codec == VideoCodec.DEFAULT) {
@@ -86,5 +104,4 @@ public class SpoofVideoStreamsPatch {
 
         app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
                 availableClients, client);
-    }
-}
+    }}
