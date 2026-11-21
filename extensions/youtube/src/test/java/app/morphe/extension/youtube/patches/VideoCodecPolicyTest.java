@@ -51,14 +51,15 @@ public class VideoCodecPolicyTest {
         assertFalse(VideoCodecPolicy.allowCodec("AVC", VP9, "video/av01"));
     }
 
-    @Test public void preferAv1RemovesOtherVideoCodecsWhenPlayableAv1ExistsAndKeepsAudio() {
-        Format av1 = new Format(AV1, 1920, 1080, 60);
+    @Test public void preferAv1PrioritizesPlayableAv1AndKeepsEveryFallbackAndAudioFormat() {
         Format vp9 = new Format(VP9, 1920, 1080, 60);
         Format avc = new Format(AVC, 1280, 720, 30);
+        Format av1 = new Format(AV1, 1920, 1080, 60);
+        Format unsupportedAv1 = new Format(AV1, 3840, 2160, 120);
         Format audio = new Format(AUDIO, 0, 0, 0);
         List<Format> result = VideoCodecPolicy.filterAdaptiveFormats(
-                List.of(av1, vp9, avc, audio), "PREFER_AV1", FULL_HD_60, ADAPTER);
-        assertEquals(List.of(av1, audio), result);
+                List.of(vp9, avc, unsupportedAv1, audio, av1), "PREFER_AV1", FULL_HD_60, ADAPTER);
+        assertEquals(List.of(av1, vp9, avc, unsupportedAv1, audio), result);
     }
 
     @Test public void preferAv1FallsBackWhenAv1IsMissingOrDecoderIsMissing() {
