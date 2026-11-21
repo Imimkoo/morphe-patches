@@ -8,6 +8,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLa
 import app.morphe.patcher.patch.patch
 import app.morphe.patches.youtube.layout.player.buttons.addPlayerBottomButton
 import app.morphe.patches.youtube.layout.player.buttons.playerOverlayButtonsHookPatch
+import app.morphe.patches.youtube.video.buffer.ibrahimBufferControlPatch
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
 import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
@@ -25,7 +26,8 @@ val ibrahimUniversalVideoControlPatch = patch(
 ) {
     dependsOn(
         sharedExtensionPatch,
-        playerOverlayButtonsHookPatch
+        playerOverlayButtonsHookPatch,
+        ibrahimBufferControlPatch
     )
 
     compatibleWith(COMPATIBILITY_YOUTUBE)
