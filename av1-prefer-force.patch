@@ -1,0 +1,725 @@
+diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/DisableVideoCodecsPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/DisableVideoCodecsPatch.java
+index e85a403..a0b417e 100644
+--- a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/DisableVideoCodecsPatch.java
++++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/DisableVideoCodecsPatch.java
+@@ -15,14 +15,17 @@ import android.media.MediaCodecList;
+ import android.os.Build;
+ import android.view.Display;
+ 
++import androidx.annotation.NonNull;
+ import androidx.annotation.Nullable;
+ 
++import java.util.ArrayList;
+ import java.util.List;
+ 
+ import app.morphe.extension.shared.Logger;
+ import app.morphe.extension.shared.settings.SharedYouTubeSettings;
+ import app.morphe.extension.shared.spoof.ClientType;
+ import app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch;
++import app.morphe.extension.youtube.patches.VideoFormat.FormatInterface;
+ import app.morphe.extension.youtube.settings.Settings;
+ 
+ @SuppressWarnings({"unused", "deprecation", "RedundantSuppression"})
+@@ -30,6 +33,8 @@ public class DisableVideoCodecsPatch {
+ 
+     public enum VideoCodec {
+         DEFAULT,
++        PREFER_AV1,
++        FORCE_AV1,
+         VP9,
+         AVC
+     }
+@@ -39,13 +44,6 @@ public class DisableVideoCodecsPatch {
+      */
+     private static final String MIMETYPE_VIDEO_AV1 = "video/av01";
+ 
+-    /**
+-     * Resolved on first use and not in a static initializer, because the default value of
+-     * {@link Settings#VIDEO_CODEC} comes from this class.
+-     */
+-    @Nullable
+-    private static volatile VideoCodec videoCodec;
+-
+     private static final int[] EMPTY_ARRAY_INT = new int[0];
+ 
+     /**
+@@ -177,6 +175,80 @@ public class DisableVideoCodecsPatch {
+         return false;
+     }
+ 
++    public static boolean hasAnyAv1Decoder() {
++        return getAv1DecoderState().hasDecoder;
++    }
++
++    private static final class Av1DecoderState {
++        final boolean hasDecoder;
++        final List<MediaCodecInfo.VideoCapabilities> videoCapabilities;
++
++        Av1DecoderState(boolean hasDecoder, List<MediaCodecInfo.VideoCapabilities> videoCapabilities) {
++            this.hasDecoder = hasDecoder;
++            this.videoCapabilities = videoCapabilities;
++        }
++    }
++
++    @Nullable
++    private static volatile Av1DecoderState cachedAv1DecoderState;
++
++    private static Av1DecoderState getAv1DecoderState() {
++        Av1DecoderState state = cachedAv1DecoderState;
++        if (state != null) {
++            return state;
++        }
++
++        boolean found = false;
++        List<MediaCodecInfo.VideoCapabilities> capsList = new ArrayList<>();
++        try {
++            for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
++                if (info.isEncoder()) {
++                    continue;
++                }
++                for (String type : info.getSupportedTypes()) {
++                    if (MIMETYPE_VIDEO_AV1.equalsIgnoreCase(type)) {
++                        found = true;
++                        try {
++                            MediaCodecInfo.CodecCapabilities caps = info.getCapabilitiesForType(type);
++                            MediaCodecInfo.VideoCapabilities videoCaps = caps != null ? caps.getVideoCapabilities() : null;
++                            if (videoCaps != null) {
++                                capsList.add(videoCaps);
++                            }
++                        } catch (Exception ex) {
++                            Logger.printDebug(() -> "Failed to read VideoCapabilities for " + info.getName());
++                        }
++                    }
++                }
++            }
++        } catch (Exception ex) {
++            Logger.printException(() -> "getAv1DecoderState failure", ex);
++        }
++
++        state = new Av1DecoderState(found, capsList);
++        cachedAv1DecoderState = state;
++        return state;
++    }
++
++    private static boolean isAv1SizeSupported(int width, int height) {
++        Av1DecoderState state = getAv1DecoderState();
++        if (!state.hasDecoder) {
++            return false;
++        }
++        if (state.videoCapabilities.isEmpty() || width <= 0 || height <= 0) {
++            return true;
++        }
++        for (MediaCodecInfo.VideoCapabilities videoCaps : state.videoCapabilities) {
++            try {
++                if (videoCaps.isSizeSupported(width, height)
++                        || videoCaps.isSizeSupported(height, width)) {
++                    return true;
++                }
++            } catch (Exception ignored) {
++            }
++        }
++        return false;
++    }
++
+     private static VideoCodec resolveVideoCodec() {
+         VideoCodec codec = Settings.VIDEO_CODEC.get();
+         if (codec == VideoCodec.AVC && !isAvcAvailable()) {
+@@ -189,19 +261,14 @@ public class DisableVideoCodecsPatch {
+      * @return The codec in use, which is VP9 if AVC is selected but cannot be forced.
+      */
+     public static VideoCodec getVideoCodec() {
+-        VideoCodec codec = videoCodec;
+-        if (codec == null) {
+-            codec = resolveVideoCodec();
+-            videoCodec = codec;
+-        }
+-        return codec;
++        return resolveVideoCodec();
+     }
+ 
+     /**
+      * Injection point.
+      */
+     public static boolean allowVP9() {
+-        final boolean allowed = getVideoCodec() != VideoCodec.AVC;
++        final boolean allowed = VideoCodecPolicy.allowVP9(getVideoCodec().name());
+         if (!allowed) {
+             Logger.printVerbose(() -> "VP9 not allowed");
+         }
+@@ -212,10 +279,40 @@ public class DisableVideoCodecsPatch {
+      * Injection point.
+      */
+     public static boolean allowCodec(String mimeType) {
+-        final boolean allowed = !(getVideoCodec() == VideoCodec.VP9 && MIMETYPE_VIDEO_AV1.equals(mimeType));
++        final boolean allowed = VideoCodecPolicy.allowCodec(getVideoCodec().name(), mimeType);
+         if (!allowed) {
+             Logger.printVerbose(() -> "Codec not allowed: " + mimeType);
+         }
+         return allowed;
+     }
++
++    /**
++     * Injection point.
++     */
++    public static List<FormatInterface> filterAdaptiveFormats(@NonNull String videoId,
++                                                              @NonNull List<FormatInterface> adaptiveFormats) {
++        final VideoCodec codec = getVideoCodec();
++        if (codec != VideoCodec.PREFER_AV1 && codec != VideoCodec.FORCE_AV1) {
++            return adaptiveFormats;
++        }
++
++        try {
++            Av1DecoderState state = getAv1DecoderState();
++            List<FormatInterface> filtered = VideoCodecPolicy.filterAdaptiveFormats(
++                    codec.name(),
++                    adaptiveFormats,
++                    FormatInterface::patch_getMimeType,
++                    FormatInterface::patch_getWidth,
++                    FormatInterface::patch_getHeight,
++                    state.hasDecoder,
++                    DisableVideoCodecsPatch::isAv1SizeSupported
++            );
++            Logger.printDebug(() -> "AV1 filter (" + codec + ") for " + videoId
++                    + ": " + adaptiveFormats.size() + " -> " + filtered.size());
++            return filtered;
++        } catch (Exception ex) {
++            Logger.printException(() -> "filterAdaptiveFormats failure", ex);
++            return adaptiveFormats;
++        }
++    }
+ }
+diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/VideoCodecPolicy.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/VideoCodecPolicy.java
+new file mode 100644
+index 0000000..12390d0
+--- /dev/null
++++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/VideoCodecPolicy.java
+@@ -0,0 +1,155 @@
++/*
++ * Copyright 2026 Morphe.
++ * https://github.com/MorpheApp/morphe-patches
++ *
++ * See the included NOTICE file for GPLv3 Section 7 terms that apply to Morphe contributions.
++ */
++
++package app.morphe.extension.youtube.patches;
++
++import androidx.annotation.Nullable;
++
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++import java.util.function.Function;
++import java.util.function.ToIntFunction;
++
++/**
++ * Pure, unit-testable video codec selection and stream-filtering policy.
++ */
++final class VideoCodecPolicy {
++
++    static final String CODEC_DEFAULT = "DEFAULT";
++    static final String CODEC_PREFER_AV1 = "PREFER_AV1";
++    static final String CODEC_FORCE_AV1 = "FORCE_AV1";
++    static final String CODEC_VP9 = "VP9";
++    static final String CODEC_AVC = "AVC";
++
++    @FunctionalInterface
++    interface Av1SizeSupport {
++        boolean isSupported(int width, int height);
++    }
++
++    private VideoCodecPolicy() {
++    }
++
++    static boolean isVideoMimeType(@Nullable String mimeType) {
++        return mimeType != null && mimeType.toLowerCase(Locale.ROOT).startsWith("video/");
++    }
++
++    static boolean isAv1MimeType(@Nullable String mimeType) {
++        if (mimeType == null) {
++            return false;
++        }
++        String lower = mimeType.toLowerCase(Locale.ROOT);
++        return lower.startsWith("video/") && lower.contains("av01");
++    }
++
++    static boolean isVp9MimeType(@Nullable String mimeType) {
++        if (mimeType == null) {
++            return false;
++        }
++        String lower = mimeType.toLowerCase(Locale.ROOT);
++        return lower.startsWith("video/") && lower.contains("vp9");
++    }
++
++    static boolean isAvcMimeType(@Nullable String mimeType) {
++        if (mimeType == null) {
++            return false;
++        }
++        String lower = mimeType.toLowerCase(Locale.ROOT);
++        return lower.startsWith("video/") && lower.contains("avc");
++    }
++
++    static boolean allowVP9(String codecName) {
++        return !CODEC_AVC.equals(codecName) && !CODEC_FORCE_AV1.equals(codecName);
++    }
++
++    static boolean allowCodec(String codecName, @Nullable String mimeType) {
++        // Never block audio or non-video MIME types.
++        if (!isVideoMimeType(mimeType)) {
++            return true;
++        }
++        if (CODEC_VP9.equals(codecName)) {
++            return !isAv1MimeType(mimeType);
++        }
++        if (CODEC_AVC.equals(codecName)) {
++            return isAvcMimeType(mimeType);
++        }
++        if (CODEC_FORCE_AV1.equals(codecName)) {
++            return isAv1MimeType(mimeType);
++        }
++        return true;
++    }
++
++    static boolean isPlayableAv1Format(@Nullable String mimeType,
++                                       int width,
++                                       int height,
++                                       boolean hasAv1Decoder,
++                                       Av1SizeSupport sizeSupport) {
++        if (!hasAv1Decoder || !isAv1MimeType(mimeType)) {
++            return false;
++        }
++        if (width <= 0 || height <= 0) {
++            return true;
++        }
++        return sizeSupport.isSupported(width, height);
++    }
++
++    static <T> List<T> filterAdaptiveFormats(String codecName,
++                                             List<T> adaptiveFormats,
++                                             Function<T, String> mimeTypeFn,
++                                             ToIntFunction<T> widthFn,
++                                             ToIntFunction<T> heightFn,
++                                             boolean hasAv1Decoder,
++                                             Av1SizeSupport sizeSupport) {
++        if (adaptiveFormats == null || adaptiveFormats.isEmpty()) {
++            return adaptiveFormats;
++        }
++        if (!CODEC_PREFER_AV1.equals(codecName) && !CODEC_FORCE_AV1.equals(codecName)) {
++            return adaptiveFormats;
++        }
++
++        if (CODEC_PREFER_AV1.equals(codecName)) {
++            if (!hasAv1Decoder) {
++                return adaptiveFormats;
++            }
++
++            boolean hasPlayableAv1 = false;
++            for (T format : adaptiveFormats) {
++                String mimeType = mimeTypeFn.apply(format);
++                if (isPlayableAv1Format(mimeType, widthFn.applyAsInt(format), heightFn.applyAsInt(format),
++                        true, sizeSupport)) {
++                    hasPlayableAv1 = true;
++                    break;
++                }
++            }
++
++            if (!hasPlayableAv1) {
++                return adaptiveFormats;
++            }
++
++            List<T> filtered = new ArrayList<>(adaptiveFormats.size());
++            for (T format : adaptiveFormats) {
++                String mimeType = mimeTypeFn.apply(format);
++                if (!isVideoMimeType(mimeType)
++                        || isPlayableAv1Format(mimeType, widthFn.applyAsInt(format), heightFn.applyAsInt(format),
++                        true, sizeSupport)) {
++                    filtered.add(format);
++                }
++            }
++            return filtered;
++        }
++
++        // FORCE_AV1: keep non-video (audio) formats and AV1 video formats only; never fall back to VP9/AVC.
++        List<T> forced = new ArrayList<>(adaptiveFormats.size());
++        for (T format : adaptiveFormats) {
++            String mimeType = mimeTypeFn.apply(format);
++            if (!isVideoMimeType(mimeType) || isAv1MimeType(mimeType)) {
++                forced.add(format);
++            }
++        }
++        return forced;
++    }
++}
+diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/spoof/SpoofVideoStreamsPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/spoof/SpoofVideoStreamsPatch.java
+index 9adcf9d..dfbf00f 100644
+--- a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/spoof/SpoofVideoStreamsPatch.java
++++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/spoof/SpoofVideoStreamsPatch.java
+@@ -1,5 +1,6 @@
+ package app.morphe.extension.youtube.patches.spoof;
+ 
++import java.util.ArrayList;
+ import java.util.List;
+ 
+ import app.morphe.extension.shared.settings.Setting;
+@@ -27,28 +28,77 @@ public class SpoofVideoStreamsPatch {
+         }
+     }
+ 
++    private static ClientType mapToAv1Client(ClientType selected) {
++        if (selected == ClientType.ANDROID_VR_DASH) {
++            return ClientType.ANDROID_XR_DASH;
++        }
++        if (selected == ClientType.ANDROID_VR_SABR) {
++            return ClientType.ANDROID_XR_SABR;
++        }
++        if (selected == ClientType.ANDROID_VR_EXPERIMENTAL) {
++            return ClientType.ANDROID_XR_EXPERIMENTAL;
++        }
++        if (selected == ClientType.VISIONOS_1_02) {
++            return ClientType.VISIONOS_1_03;
++        }
++        if (selected == ClientType.VISIONOS_1_06) {
++            return ClientType.VISIONOS_1_06_AV1;
++        }
++        if (selected == ClientType.TV_SABR
++                || selected == ClientType.TV_SIMPLY
++                || selected == ClientType.MWEB
++                || selected == ClientType.ANDROID_XR_DASH
++                || selected == ClientType.ANDROID_XR_SABR
++                || selected == ClientType.ANDROID_XR_EXPERIMENTAL
++                || selected == ClientType.VISIONOS_1_03
++                || selected == ClientType.VISIONOS_1_06_AV1) {
++            return selected;
++        }
++        // ANDROID_CREATOR and other non-AV1 clients do not serve AV1 streams.
++        return ClientType.TV_SABR;
++    }
++
+     /**
+      * Injection point.
+      */
+     public static void setClientOrderToUse() {
+         ClientType client = Settings.SPOOF_VIDEO_STREAMS_CLIENT_TYPE.get();
++        final VideoCodec codec = DisableVideoCodecsPatch.getVideoCodec();
++
++        if (codec == VideoCodec.FORCE_AV1) {
++            ClientType preferred = mapToAv1Client(client);
++            List<ClientType> av1Clients = new ArrayList<>();
++            av1Clients.add(ClientType.TV_SABR);
++            av1Clients.add(ClientType.VISIONOS_1_06_AV1);
++            av1Clients.add(ClientType.ANDROID_XR_EXPERIMENTAL);
++            app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
++                    av1Clients, preferred);
++            return;
++        }
++
++        if (codec == VideoCodec.PREFER_AV1) {
++            ClientType preferred = mapToAv1Client(client);
++            List<ClientType> fallbackClients = new ArrayList<>();
++            fallbackClients.add(ClientType.TV_SABR);
++            fallbackClients.add(ClientType.VISIONOS_1_06_AV1);
++            if (client != preferred && !fallbackClients.contains(client)) {
++                fallbackClients.add(client);
++            }
++            if (!fallbackClients.contains(ClientType.ANDROID_CREATOR)) {
++                fallbackClients.add(ClientType.ANDROID_CREATOR);
++            }
++            app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
++                    fallbackClients, preferred);
++            return;
++        }
+ 
+         // Use the Android XR or visionOS client that has AV1 if user settings allow it.
+         // AVC cannot be forced with these clients because they use VP9 and AV1.
+         // VP9 blocks AV1, so the AV1 clients are not used.
+-        final VideoCodec codec = DisableVideoCodecsPatch.getVideoCodec();
+         if (Settings.SPOOF_VIDEO_STREAMS_AV1.get() && codec == VideoCodec.DEFAULT) {
+-            if (client == ClientType.ANDROID_VR_DASH) {
+-                client = ClientType.ANDROID_XR_DASH;
+-            } else if (client == ClientType.ANDROID_VR_SABR) {
+-                client = ClientType.ANDROID_XR_SABR;
+-            } else if (client == ClientType.ANDROID_VR_EXPERIMENTAL) {
+-                client = ClientType.ANDROID_XR_EXPERIMENTAL;
+-            } else if (client == ClientType.VISIONOS_1_02) {
+-                client = ClientType.VISIONOS_1_03;
+-            } else if (client == ClientType.VISIONOS_1_06) {
+-                client = ClientType.VISIONOS_1_06_AV1;
+-            }
++            client = mapToAv1Client(client);
+         }
+ 
+         List<ClientType> availableClients = List.of(
+@@ -58,7 +108,6 @@ public class SpoofVideoStreamsPatch {
+                 // Only use it if the user has selected it.
+                 // ClientType.ANDROID_VR_DASH
+         );
+-
+         app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
+                 availableClients, client);
+     }
+diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/settings/preference/VideoCodecListPreference.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/settings/preference/VideoCodecListPreference.java
+index 99d7575..0290add 100644
+--- a/extensions/youtube/src/main/java/app/morphe/extension/youtube/settings/preference/VideoCodecListPreference.java
++++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/settings/preference/VideoCodecListPreference.java
+@@ -41,6 +41,12 @@ public class VideoCodecListPreference extends CustomDialogListPreference {
+         super(context);
+     }
+ 
++    @Override
++    public void setValue(String value) {
++        super.setValue(value);
++        app.morphe.extension.youtube.patches.spoof.SpoofVideoStreamsPatch.setClientOrderToUse();
++    }
++
+     @Override
+     public void setSummary(@Nullable CharSequence summary) {
+         if (VideoCodec.AVC.name().equals(getValue()) && !DisableVideoCodecsPatch.isAvcAvailable()) {
+@@ -0,0 +1,167 @@
++/*
++ * Copyright 2026 Morphe.
++ * https://github.com/MorpheApp/morphe-patches
++ *
++ * See the included NOTICE file for GPLv3 Section 7 terms that apply to Morphe contributions.
++ */
++
++package app.morphe.extension.youtube.patches;
++
++import static org.junit.Assert.assertEquals;
++import static org.junit.Assert.assertFalse;
++import static org.junit.Assert.assertTrue;
++
++import org.junit.Test;
++
++import java.util.List;
++
++public class VideoCodecPolicyTest {
++
++    private static final String AV1 = "video/av01";
++    private static final String AV1_DASH = "video/mp4; codecs=\"av01.0.08M.08\"";
++    private static final String VP9 = "video/x-vnd.on2.vp9";
++    private static final String VP9_DASH = "video/webm; codecs=\"vp9\"";
++    private static final String AVC = "video/avc";
++    private static final String AVC_DASH = "video/mp4; codecs=\"avc1.640028\"";
++    private static final String AUDIO_AAC = "audio/mp4; codecs=\"mp4a.40.2\"";
++    private static final String AUDIO_OPUS = "audio/webm; codecs=\"opus\"";
++
++    private static final class TestFormat {
++        final String mimeType;
++        final int width;
++        final int height;
++
++        TestFormat(String mimeType, int width, int height) {
++            this.mimeType = mimeType;
++            this.width = width;
++            this.height = height;
++        }
++
++        String mimeType() {
++            return mimeType;
++        }
++
++        int width() {
++            return width;
++        }
++
++        int height() {
++            return height;
++        }
++    }
++
++    private static List<TestFormat> filter(String codec,
++                                           List<TestFormat> formats,
++                                           boolean hasDecoder,
++                                           VideoCodecPolicy.Av1SizeSupport sizeSupport) {
++        return VideoCodecPolicy.filterAdaptiveFormats(
++                codec,
++                formats,
++                TestFormat::mimeType,
++                TestFormat::width,
++                TestFormat::height,
++                hasDecoder,
++                sizeSupport
++        );
++    }
++
++    @Test
++    public void allowCodecNeverBlocksAudioOrNull() {
++        for (String mode : List.of("DEFAULT", "PREFER_AV1", "FORCE_AV1", "VP9", "AVC")) {
++            assertTrue(VideoCodecPolicy.allowCodec(mode, AUDIO_AAC));
++            assertTrue(VideoCodecPolicy.allowCodec(mode, AUDIO_OPUS));
++            assertTrue(VideoCodecPolicy.allowCodec(mode, null));
++        }
++    }
++
++    @Test
++    public void allowCodecAndVp9FlagsPerMode() {
++        assertTrue(VideoCodecPolicy.allowVP9("DEFAULT"));
++        assertTrue(VideoCodecPolicy.allowVP9("PREFER_AV1"));
++        assertTrue(VideoCodecPolicy.allowVP9("VP9"));
++        assertFalse(VideoCodecPolicy.allowVP9("AVC"));
++        assertFalse(VideoCodecPolicy.allowVP9("FORCE_AV1"));
++
++        assertTrue(VideoCodecPolicy.allowCodec("FORCE_AV1", AV1));
++        assertTrue(VideoCodecPolicy.allowCodec("FORCE_AV1", AV1_DASH));
++        assertFalse(VideoCodecPolicy.allowCodec("FORCE_AV1", VP9));
++        assertFalse(VideoCodecPolicy.allowCodec("FORCE_AV1", AVC));
++
++        assertFalse(VideoCodecPolicy.allowCodec("VP9", AV1));
++        assertTrue(VideoCodecPolicy.allowCodec("VP9", VP9));
++        assertTrue(VideoCodecPolicy.allowCodec("VP9", AVC));
++
++        assertFalse(VideoCodecPolicy.allowCodec("AVC", AV1));
++        assertFalse(VideoCodecPolicy.allowCodec("AVC", VP9));
++        assertTrue(VideoCodecPolicy.allowCodec("AVC", AVC));
++    }
++
++    @Test
++    public void preferAv1StripsOtherVideoCodecsWhenPlayableAv1Exists() {
++        TestFormat av1_1080 = new TestFormat(AV1_DASH, 1920, 1080);
++        TestFormat vp9_1080 = new TestFormat(VP9_DASH, 1920, 1080);
++        TestFormat avc_1080 = new TestFormat(AVC_DASH, 1920, 1080);
++        TestFormat audio = new TestFormat(AUDIO_OPUS, 0, 0);
++
++        List<TestFormat> result = filter(
++                "PREFER_AV1",
++                List.of(av1_1080, vp9_1080, avc_1080, audio),
++                true,
++                (w, h) -> true
++        );
++
++        assertEquals(List.of(av1_1080, audio), result);
++    }
++
++    @Test
++    public void preferAv1FallsBackWhenAv1IsMissing() {
++        TestFormat vp9 = new TestFormat(VP9_DASH, 1920, 1080);
++        TestFormat avc = new TestFormat(AVC_DASH, 1920, 1080);
++        TestFormat audio = new TestFormat(AUDIO_AAC, 0, 0);
++        List<TestFormat> input = List.of(vp9, avc, audio);
++
++        List<TestFormat> result = filter("PREFER_AV1", input, true, (w, h) -> true);
++        assertEquals(input, result);
++    }
++
++    @Test
++    public void preferAv1FallsBackWhenNoAv1DecoderOrResolutionUnsupported() {
++        TestFormat av1_4k = new TestFormat(AV1_DASH, 3840, 2160);
++        TestFormat vp9_1080 = new TestFormat(VP9_DASH, 1920, 1080);
++        TestFormat audio = new TestFormat(AUDIO_OPUS, 0, 0);
++        List<TestFormat> input = List.of(av1_4k, vp9_1080, audio);
++
++        // No AV1 decoder on device -> keep VP9 fallback.
++        assertEquals(input, filter("PREFER_AV1", input, false, (w, h) -> true));
++
++        // AV1 decoder only supports up to 1080p -> 4K AV1 is unplayable, keep VP9 fallback.
++        assertEquals(input, filter("PREFER_AV1", input, true, (w, h) -> w <= 1920 && h <= 1080));
++    }
++
++    @Test
++    public void preferAv1KeepsOnlySupportedAv1Resolutions() {
++        TestFormat av1_4k = new TestFormat(AV1_DASH, 3840, 2160);
++        TestFormat av1_1080 = new TestFormat(AV1_DASH, 1920, 1080);
++        TestFormat vp9_1080 = new TestFormat(VP9_DASH, 1920, 1080);
++        TestFormat audio = new TestFormat(AUDIO_OPUS, 0, 0);
++
++        List<TestFormat> result = filter(
++                "PREFER_AV1",
++                List.of(av1_4k, av1_1080, vp9_1080, audio),
++                true,
++                (w, h) -> w <= 1920 && h <= 1080
++        );
++
++        assertEquals(List.of(av1_1080, audio), result);
++    }
++
++    @Test
++    public void forceAv1StrictlyStripsNonAv1VideoEvenWhenAv1IsMissing() {
++        TestFormat vp9 = new TestFormat(VP9_DASH, 1920, 1080);
++        TestFormat avc = new TestFormat(AVC_DASH, 1920, 1080);
++        TestFormat audio = new TestFormat(AUDIO_AAC, 0, 0);
++
++        List<TestFormat> result = filter("FORCE_AV1", List.of(vp9, avc, audio), false, (w, h) -> false);
++        assertEquals(List.of(audio), result);
++    }
++}
+diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/video/codecs/DisableVideoCodecsPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/video/codecs/DisableVideoCodecsPatch.kt
+index ed0369f..4b8ce9f 100644
+--- a/patches/src/main/kotlin/app/morphe/patches/youtube/video/codecs/DisableVideoCodecsPatch.kt
++++ b/patches/src/main/kotlin/app/morphe/patches/youtube/video/codecs/DisableVideoCodecsPatch.kt
+@@ -21,6 +21,8 @@ import app.morphe.patches.shared.misc.settings.preference.noTitleUnsortedPrefere
+ import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
+ import app.morphe.patches.youtube.misc.settings.PreferenceScreen
+ import app.morphe.patches.youtube.misc.settings.settingsPatch
++import app.morphe.patches.youtube.video.format.hookAdaptiveFormat
++import app.morphe.patches.youtube.video.format.videoFormatPatch
+ import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
+ import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+ 
+@@ -29,11 +31,12 @@ val disableVideoCodecsPatch = patch(
+     name = "Disable video codecs",
+-    description = "Adds options to disable or force HDR, and to disable VP9 or AV1 codecs.",
++    description = "Adds options to disable or force HDR, and to prefer or force AV1, VP9, or AVC codecs.",
+ ) {
+     dependsOn(
+         sharedExtensionPatch,
+-        settingsPatch
++        settingsPatch,
++        videoFormatPatch
+     )
+ 
+     compatibleWith(COMPATIBILITY_YOUTUBE)
+@@ -50,6 +53,8 @@ val disableVideoCodecsPatch = patch(
+             )
+         )
+ 
++        hookAdaptiveFormat("$EXTENSION_CLASS->filterAdaptiveFormats")
++
+         Vp9CapabilityFingerprint.method.addInstructionsWithLabels(
+             0,
+             """
+diff --git a/patches/src/main/resources/addresources/values/youtube/arrays.xml b/patches/src/main/resources/addresources/values/youtube/arrays.xml
+index b4fdded..5b78c8f 100644
+--- a/patches/src/main/resources/addresources/values/youtube/arrays.xml
++++ b/patches/src/main/resources/addresources/values/youtube/arrays.xml
+@@ -921,11 +921,15 @@
+     <!-- video.codecs.disableVideoCodecsPatch -->
+     <string-array name="morphe_video_codec_entries">
+         <item>@string/morphe_video_codec_entry_default</item>
++        <item>@string/morphe_video_codec_entry_prefer_av1</item>
++        <item>@string/morphe_video_codec_entry_force_av1</item>
+         <item>@string/morphe_video_codec_entry_vp9</item>
+         <item>@string/morphe_video_codec_entry_avc</item>
+     </string-array>
+     <string-array name="morphe_video_codec_entry_values">
+         <item>DEFAULT</item>
++        <item>PREFER_AV1</item>
++        <item>FORCE_AV1</item>
+         <item>VP9</item>
+         <item>AVC</item>
+     </string-array>
+diff --git a/patches/src/main/resources/addresources/values/youtube/strings.xml b/patches/src/main/resources/addresources/values/youtube/strings.xml
+index 6a7837e..18843c8 100644
+--- a/patches/src/main/resources/addresources/values/youtube/strings.xml
++++ b/patches/src/main/resources/addresources/values/youtube/strings.xml
+@@ -1839,11 +1839,21 @@ Limitations:
+ • HDR still depends on the spoof video streams client"</string>
+     <string name="morphe_video_codec_title">Video codec</string>
+     <string name="morphe_video_codec_entry_default">Default</string>
++    <string name="morphe_video_codec_entry_prefer_av1">Prefer AV1</string>
++    <string name="morphe_video_codec_entry_force_av1">Force AV1 only</string>
+     <string name="morphe_video_codec_entry_vp9" translatable="false">VP9</string>
+     <string name="morphe_video_codec_entry_avc" translatable="false">AVC (H.264)</string>
+     <!-- 'Spoof video streams' should be the same translation used for 'morphe_spoof_video_streams_screen_title'. -->
+     <string name="morphe_video_codec_avc_not_available">To force AVC, change \'Spoof video streams\' to \'Android Studio\', \'Android VR\' or \'visionOS\'</string>
+-    <string name="morphe_video_codec_user_dialog_message">"VP9
++    <string name="morphe_video_codec_user_dialog_message">"Prefer AV1
++• Prioritizes AV1 streams whenever available and supported by your device
++• Falls back to VP9 or AVC if AV1 is unavailable
++
++Force AV1 only
++• Allows only AV1 video streams with no VP9 or AVC fallback
++• Playback fails if a video has no AV1 stream
++
++VP9
+ • Can improve battery life and fix playback stuttering
+ • Uses more internet data than AV1
+ 
