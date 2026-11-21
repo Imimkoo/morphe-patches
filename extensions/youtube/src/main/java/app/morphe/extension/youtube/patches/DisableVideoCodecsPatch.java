@@ -228,7 +228,7 @@ public class DisableVideoCodecsPatch {
                         format.patch_getMimeType(),
                         format.patch_getWidth(),
                         format.patch_getHeight(),
-                        format.patch_getFps()
+                        0 // Frame rate is not exposed by the target format fingerprint; validate dimensions only.
                 )
         );
     }
