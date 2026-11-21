@@ -20,7 +20,10 @@ final class VideoCodecPolicy {
         if ("FORCE_AV1".equals(codec)) {
             return av1MimeType.equalsIgnoreCase(mimeType);
         }
-        if ("VP9".equals(codec) || "AVC".equals(codec)) {
+        if ("AVC".equals(codec)) {
+            return "video/avc".equalsIgnoreCase(mimeType);
+        }
+        if ("VP9".equals(codec)) {
             return !av1MimeType.equalsIgnoreCase(mimeType);
         }
         return true;
