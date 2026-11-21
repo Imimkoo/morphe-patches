@@ -30,6 +30,8 @@ public class DisableVideoCodecsPatch {
 
     public enum VideoCodec {
         DEFAULT,
+        PREFER_AV1,
+        FORCE_AV1,
         VP9,
         AVC
     }
@@ -201,7 +203,8 @@ public class DisableVideoCodecsPatch {
      * Injection point.
      */
     public static boolean allowVP9() {
-        final boolean allowed = getVideoCodec() != VideoCodec.AVC;
+        final VideoCodec codec = getVideoCodec();
+        final boolean allowed = codec != VideoCodec.AVC && codec != VideoCodec.FORCE_AV1;
         if (!allowed) {
             Logger.printVerbose(() -> "VP9 not allowed");
         }
@@ -212,7 +215,10 @@ public class DisableVideoCodecsPatch {
      * Injection point.
      */
     public static boolean allowCodec(String mimeType) {
-        final boolean allowed = !(getVideoCodec() == VideoCodec.VP9 && MIMETYPE_VIDEO_AV1.equals(mimeType));
+        final VideoCodec codec = getVideoCodec();
+        final boolean allowed = codec == VideoCodec.FORCE_AV1
+                ? MIMETYPE_VIDEO_AV1.equalsIgnoreCase(mimeType)
+                : !(codec == VideoCodec.VP9 && MIMETYPE_VIDEO_AV1.equalsIgnoreCase(mimeType));
         if (!allowed) {
             Logger.printVerbose(() -> "Codec not allowed: " + mimeType);
         }
