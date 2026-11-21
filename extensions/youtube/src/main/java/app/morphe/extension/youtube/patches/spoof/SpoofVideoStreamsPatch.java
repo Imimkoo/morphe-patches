@@ -104,4 +104,6 @@ public class SpoofVideoStreamsPatch {
 
         app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
                 availableClients, client);
-    }}
+    }
+}
+
