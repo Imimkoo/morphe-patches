@@ -82,6 +82,19 @@ public class StreamingDataRequest {
 
     private static volatile ClientType[] clientOrderToUse = ClientType.values();
 
+    /**
+     * Optional codec-aware validator. A rejected response makes the fetch loop try the next client.
+     */
+    public interface AdaptiveFormatValidator {
+        boolean hasAcceptedVideoFormat(List<Format> formats, ClientType client);
+    }
+
+    private static volatile AdaptiveFormatValidator adaptiveFormatValidator;
+
+    public static void setAdaptiveFormatValidator(@Nullable AdaptiveFormatValidator validator) {
+        adaptiveFormatValidator = validator;
+    }
+
     public static void setClientOrderToUse(List<ClientType> availableClients, ClientType preferredClient) {
         List<ClientType> orderToUse = buildClientOrder(availableClients, preferredClient);
 
@@ -808,6 +821,15 @@ public class StreamingDataRequest {
                 responseBuilder.setStreamingData(responseBuilder.getStreamingData().toBuilder()
                         .setServerAbrStreamingUrl(siteSession.serverAbrStreamingUrl));
                 MwebStream.onStreams(videoId, siteSession);
+            }
+
+            streamingData = responseBuilder.getStreamingData();
+            AdaptiveFormatValidator validator = adaptiveFormatValidator;
+            if (validator != null && !validator.hasAcceptedVideoFormat(
+                    streamingData.getAdaptiveFormatsList(), clientType)) {
+                Logger.printDebug(() -> "Rejecting client without required AV1 video format: "
+                        + clientType + ", videoId: " + videoId);
+                return null;
             }
 
             byte[] streamingDataBuffer = responseBuilder.build().toByteArray();

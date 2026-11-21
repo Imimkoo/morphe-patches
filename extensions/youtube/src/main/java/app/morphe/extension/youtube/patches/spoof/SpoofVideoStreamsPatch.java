@@ -17,9 +17,7 @@ public class SpoofVideoStreamsPatch {
         public boolean isAvailable() {
             ClientType client = Settings.SPOOF_VIDEO_STREAMS_CLIENT_TYPE.get();
             return Settings.SPOOF_VIDEO_STREAMS_CLIENT_TYPE.isAvailable()
-                    && (client == ClientType.ANDROID_VR_DASH || client == ClientType.ANDROID_VR_SABR
-                    || client == ClientType.ANDROID_VR_EXPERIMENTAL
-                    || client == ClientType.VISIONOS_1_02 || client == ClientType.VISIONOS_1_06);
+                    && isAv1CapableClient(client);
         }
 
         @Override
@@ -28,40 +26,75 @@ public class SpoofVideoStreamsPatch {
         }
     }
 
+    private static boolean isAv1CapableClient(ClientType client) {
+        return client == ClientType.ANDROID_XR_SABR
+                || client == ClientType.ANDROID_XR_DASH
+                || client == ClientType.ANDROID_XR_EXPERIMENTAL
+                || client == ClientType.VISIONOS_1_03
+                || client == ClientType.VISIONOS_1_06_AV1
+                || client == ClientType.TV_SABR
+                || client == ClientType.TV_SABR_WII_U
+                || client == ClientType.TV_SIMPLY;
+    }
+
+    static List<ClientType> av1ClientsInOrder(ClientType selected) {
+        List<ClientType> clients = new ArrayList<>();
+        // Prefer clients that do not require OAuth2 sign-in or a JS/PoToken setup first.
+        ClientType[] order = {
+                ClientType.VISIONOS_1_06_AV1,
+                ClientType.VISIONOS_1_03,
+                ClientType.TV_SABR,
+                ClientType.TV_SIMPLY,
+                ClientType.ANDROID_XR_EXPERIMENTAL,
+                ClientType.ANDROID_XR_DASH,
+                ClientType.ANDROID_XR_SABR
+        };
+        if (isAv1CapableClient(selected)) clients.add(selected);
+        for (ClientType candidate : order) {
+            if (candidate != selected && !clients.contains(candidate)) clients.add(candidate);
+        }
+        return clients;
+    }
+
     /**
      * Injection point.
      */
     public static void setClientOrderToUse() {
-        ClientType client = Settings.SPOOF_VIDEO_STREAMS_CLIENT_TYPE.get();
-
+        ClientType selected = Settings.SPOOF_VIDEO_STREAMS_CLIENT_TYPE.get();
         final VideoCodec codec = DisableVideoCodecsPatch.getVideoCodec();
 
-        // This client is documented in ClientType as receiving AV1 streams from YouTube.
-        // Prefer AV1 tries it first and then falls back to the user's selected client.
-        // Force AV1 only uses this client with no fallback clients, so a missing AV1 stream
-        // or unavailable XR sign-in correctly results in playback failure.
         if (codec == VideoCodec.FORCE_AV1) {
-            app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
-                    List.of(), ClientType.ANDROID_XR_EXPERIMENTAL);
-            return;
-        }
-        if (codec == VideoCodec.PREFER_AV1) {
-            List<ClientType> fallbackClients = new ArrayList<>();
-            if (client != ClientType.ANDROID_XR_EXPERIMENTAL) {
-                fallbackClients.add(client);
-            }
-            if (client != ClientType.TV_SABR) {
-                fallbackClients.add(ClientType.TV_SABR);
-            }
-            if (client != ClientType.ANDROID_CREATOR) {
-                fallbackClients.add(ClientType.ANDROID_CREATOR);
-            }
-            app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
-                    fallbackClients, ClientType.ANDROID_XR_EXPERIMENTAL);
+            app.morphe.extension.shared.spoof.requests.StreamingDataRequest.setAdaptiveFormatValidator(
+                    (formats, client) -> formats.stream().anyMatch(format -> format.getMimeType() != null
+                            && format.getMimeType().toLowerCase(java.util.Locale.ROOT).contains("av01")));
+            List<ClientType> av1Clients = av1ClientsInOrder(selected);
+            ClientType preferred = av1Clients.remove(0);
+            // No non-AV1 clients are included: AV1-only mode never falls back to VP9/AVC.
+            app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(av1Clients, preferred);
             return;
         }
 
+        if (codec == VideoCodec.PREFER_AV1) {
+            app.morphe.extension.shared.spoof.requests.StreamingDataRequest.setAdaptiveFormatValidator(
+                    (formats, client) -> !isAv1CapableClient(client) || formats.stream().anyMatch(format ->
+                            format.getMimeType() != null
+                                    && format.getMimeType().toLowerCase(java.util.Locale.ROOT).contains("av01")));
+            List<ClientType> av1Clients = av1ClientsInOrder(selected);
+            ClientType preferred = av1Clients.remove(0);
+            List<ClientType> fallbackClients = new ArrayList<>(av1Clients);
+            if (!isAv1CapableClient(selected)) fallbackClients.add(selected);
+            // Keep established non-AV1 fallbacks after every AV1-capable client.
+            for (ClientType fallback : List.of(ClientType.MWEB, ClientType.ANDROID_CREATOR)) {
+                if (fallback != preferred && !fallbackClients.contains(fallback)) fallbackClients.add(fallback);
+            }
+            app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(fallbackClients, preferred);
+            return;
+        }
+
+        app.morphe.extension.shared.spoof.requests.StreamingDataRequest.setAdaptiveFormatValidator(null);
+
         // Preserve the existing opt-in AV1 client mapping for Default mode.
+        ClientType client = selected;
         if (Settings.SPOOF_VIDEO_STREAMS_AV1.get() && codec == VideoCodec.DEFAULT) {
             if (client == ClientType.ANDROID_VR_DASH) {
                 client = ClientType.ANDROID_XR_DASH;
@@ -76,15 +109,7 @@ public class SpoofVideoStreamsPatch {
             }
         }
 
-        List<ClientType> availableClients = List.of(
-                ClientType.TV_SABR,
-                ClientType.ANDROID_CREATOR
-                // If not signed in to Android VR, there may be playback issues.
-                // Only use it if the user has selected it.
-                // ClientType.ANDROID_VR_DASH
-        );
-
-        app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(
-                availableClients, client);
+        List<ClientType> availableClients = List.of(ClientType.TV_SABR, ClientType.ANDROID_CREATOR);
+        app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.setClientsToUse(availableClients, client);
     }
 }

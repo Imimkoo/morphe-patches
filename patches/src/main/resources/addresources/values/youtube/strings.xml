@@ -1859,14 +1859,16 @@ Limitations:
 • Uses more internet data than AV1
 
 Prefer AV1
-• With 'Spoof video streams' enabled, tries the Android XR AV1 client first
-• Falls back to your selected client and other supported clients if AV1 is unavailable
+• Filters adaptive formats so ExoPlayer receives playable AV1 video formats first
+• Checks the device's AV1 decoder, supported resolution and frame rate
+• With 'Spoof video streams' enabled, tries AV1-capable clients before non-AV1 fallbacks
+• Falls back to other video codecs only when no playable AV1 stream is available
 
 Force AV1 only
-• With 'Spoof video streams' enabled, uses only the Android XR AV1 client
-• Without spoofing, the original YouTube client must provide AV1
-• Rejects every video codec except AV1
-• Playback fails if XR sign-in or an AV1 stream is unavailable
+• With 'Spoof video streams' enabled, tries all supported AV1-capable clients
+• Rejects VP9 and AVC video formats; audio formats remain available
+• Does not fall back to another video codec if AV1 is unavailable
+• Playback fails when no AV1 stream can be obtained or decoded
 
 AVC (H.264)
 • Requires \'Android Studio\', \'Android VR\', or \'visionOS\' Spoof video stream client

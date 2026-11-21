@@ -12,11 +12,14 @@ package app.morphe.extension.youtube.patches;
 
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
+import android.media.MediaCodecInfo.CodecCapabilities;
+import android.media.MediaCodecInfo.VideoCapabilities;
 import android.os.Build;
 import android.view.Display;
 
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import app.morphe.extension.shared.Logger;
@@ -142,34 +145,92 @@ public class DisableVideoCodecsPatch {
      * @return The default codec setting, which is VP9 if the device cannot hardware decode AV1.
      */
     public static VideoCodec getDefaultVideoCodec() {
-        return hasHardwareAv1Decoder() ? VideoCodec.DEFAULT : VideoCodec.VP9;
+        return hasAv1Decoder() ? VideoCodec.DEFAULT : VideoCodec.VP9;
     }
 
-    private static boolean hasHardwareAv1Decoder() {
-        // Android 9 and older cannot report if a decoder is hardware accelerated,
-        // and devices with a hardware AV1 decoder all ship with Android 10 or newer.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            return false;
+    private static volatile List<VideoCapabilities> av1DecoderCapabilities;
+
+    /**
+     * Enumerates every regular AV1 decoder, including hardware and software implementations.
+     */
+    private static List<VideoCapabilities> getAv1DecoderCapabilities() {
+        List<VideoCapabilities> cached = av1DecoderCapabilities;
+        if (cached != null) {
+            return cached;
         }
 
-        try {
-            for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
-                if (info.isEncoder() || !info.isHardwareAccelerated()) {
-                    continue;
-                }
-                for (String type : info.getSupportedTypes()) {
-                    if (MIMETYPE_VIDEO_AV1.equalsIgnoreCase(type)) {
-                        Logger.printDebug(() -> "Found hardware AV1 decoder: " + info.getName());
-                        return true;
+        List<VideoCapabilities> found = new ArrayList<>();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
+                    if (info.isEncoder()) {
+                        continue;
+                    }
+                    for (String type : info.getSupportedTypes()) {
+                        if (MIMETYPE_VIDEO_AV1.equalsIgnoreCase(type)) {
+                            CodecCapabilities capabilities = info.getCapabilitiesForType(type);
+                            VideoCapabilities video = capabilities.getVideoCapabilities();
+                            if (video != null) {
+                                found.add(video);
+                                Logger.printDebug(() -> "Found AV1 decoder: " + info.getName()
+                                        + ", hardware=" + (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                                        && info.isHardwareAccelerated()));
+                            }
+                        }
                     }
                 }
+            } catch (Exception ex) {
+                Logger.printException(() -> "getAv1DecoderCapabilities failure", ex);
             }
-        } catch (Exception ex) {
-            Logger.printException(() -> "hasHardwareAv1Decoder failure", ex);
         }
 
-        Logger.printDebug(() -> "No hardware AV1 decoder found");
+        av1DecoderCapabilities = found;
+        Logger.printDebug(() -> found.isEmpty()
+                ? "No AV1 decoder found"
+                : "AV1 decoders found: " + found.size());
+        return found;
+    }
+
+    private static boolean hasAv1Decoder() {
+        return !getAv1DecoderCapabilities().isEmpty();
+    }
+
+    private static boolean supportsAv1Format(int width, int height, int frameRate) {
+        if (width <= 0 || height <= 0) {
+            return false;
+        }
+        for (VideoCapabilities capabilities : getAv1DecoderCapabilities()) {
+            try {
+                boolean supported = frameRate > 0
+                        ? capabilities.areSizeAndRateSupported(width, height, frameRate)
+                        : capabilities.isSizeSupported(width, height);
+                if (supported) {
+                    return true;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // Try the next decoder; dimensions may exceed this decoder's advertised bounds.
+            }
+        }
         return false;
+    }
+
+    /**
+     * Injection point called from VideoFormatPatch before ExoPlayer receives adaptive formats.
+     */
+    public static List<VideoFormat.FormatInterface> filterAdaptiveFormats(
+            @Nullable String videoId, List<VideoFormat.FormatInterface> adaptiveFormats) {
+        VideoCodec codec = getVideoCodec();
+        return VideoCodecPolicy.filterAdaptiveFormats(
+                adaptiveFormats,
+                codec.name(),
+                DisableVideoCodecsPatch::supportsAv1Format,
+                format -> new VideoCodecPolicy.FormatDescriptor(
+                        format.patch_getMimeType(),
+                        format.patch_getWidth(),
+                        format.patch_getHeight(),
+                        format.patch_getFps()
+                )
+        );
     }
 
     private static VideoCodec resolveVideoCodec() {
