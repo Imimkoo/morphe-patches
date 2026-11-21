@@ -1,0 +1,39 @@
+name: Apply AV1 patch and verify
+on:
+  push:
+    branches:
+      - feature/av1-prefer-force-dev
+    paths:
+      - av1-prefer-force.patch
+permissions:
+  contents: write
+jobs:
+  apply-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/av1-prefer-force-dev
+          fetch-depth: 0
+      - name: Apply exact unified patch and remove patch file
+        run: |
+          test -f av1-prefer-force.patch
+          git apply --check av1-prefer-force.patch
+          git apply av1-prefer-force.patch
+          rm av1-prefer-force.patch
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add AV1 preference and force modes"
+          git push origin HEAD:feature/av1-prefer-force-dev
+      - name: Run unit tests
+        run: ./gradlew :patches:test :extensions:youtube:testDebugUnitTest :extensions:music:testDebugUnitTest --no-daemon
+      - name: Build Android patch bundle
+        run: ./gradlew :patches:buildAndroid --no-daemon
+      - name: Upload Android bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: morphe-patches-av1-android-bundle
+          path: patches/build/libs/patches-*.mpp
+          if-no-files-found: error
+          retention-days: 14
