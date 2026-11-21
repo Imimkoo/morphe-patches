@@ -43,6 +43,8 @@ public class DisableVideoCodecsPatch {
 
     private static final int[] EMPTY_ARRAY_INT = new int[0];
 
+    private static volatile Boolean av1DecoderAvailable;
+
     /**
      * HDR types YouTube checks via {@link Display.HdrCapabilities#getSupportedHdrTypes()}.
      * HLG is the type HyperOS often omits even when the decoder can play YouTube HDR.
@@ -139,10 +141,88 @@ public class DisableVideoCodecsPatch {
     }
 
     /**
-     * @return The default codec setting, which is VP9 if the device cannot hardware decode AV1.
+     * @return Whether Android exposes an AV1 decoder, hardware or software.
+     */
+    private static boolean hasAv1Decoder() {
+        Boolean cached = av1DecoderAvailable;
+        if (cached != null) {
+            return cached;
+        }
+
+        boolean available = false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
+                    if (info.isEncoder()) {
+                        continue;
+                    }
+                    for (String type : info.getSupportedTypes()) {
+                        if (MIMETYPE_VIDEO_AV1.equalsIgnoreCase(type)) {
+                            try {
+                                info.getCapabilitiesForType(type);
+                                Logger.printDebug(() -> "Found AV1 decoder: " + info.getName());
+                                available = true;
+                                break;
+                            } catch (Exception ignored) {
+                                // A codec may advertise an alias without usable decoder capabilities.
+                            }
+                        }
+                    }
+                    if (available) {
+                        break;
+                    }
+                }
+            } catch (Exception ex) {
+                Logger.printException(() -> "hasAv1Decoder failure", ex);
+            }
+        }
+
+        av1DecoderAvailable = available;
+        Logger.printDebug(() -> "AV1 decoder available: " + available);
+        return available;
+    }
+
+    /**
+     * @return The default codec setting. Prefer AV1 when Android exposes a decoder;
+     * otherwise use VP9 as the efficient fallback.
      */
     public static VideoCodec getDefaultVideoCodec() {
-        return hasHardwareAv1Decoder() ? VideoCodec.DEFAULT : VideoCodec.VP9;
+        return hasAv1Decoder() ? VideoCodec.PREFER_AV1 : VideoCodec.VP9;
+    }
+
+    /**
+     * Injection point called while YouTube builds its adaptive format list.
+     */
+    public static List<VideoFormat.FormatInterface> hookAdaptiveFormats(
+            @Nullable String videoId,
+            @NonNull List<VideoFormat.FormatInterface> adaptiveFormats
+    ) {
+        final VideoCodec codec = getVideoCodec();
+        final boolean decoderAvailable = codec == VideoCodec.PREFER_AV1 && hasAv1Decoder();
+        final List<VideoFormat.FormatInterface> filtered = VideoCodecPolicy.filterAdaptiveFormats(
+                codec.name(), adaptiveFormats, decoderAvailable
+        );
+
+        if (filtered != adaptiveFormats) {
+            int av1Count = 0;
+            int videoCount = 0;
+            for (VideoFormat.FormatInterface format : filtered) {
+                if (format == null) {
+                    continue;
+                }
+                String mimeType = format.patch_getMimeType();
+                if (VideoCodecPolicy.isVideoMime(mimeType)) {
+                    videoCount++;
+                    if (VideoCodecPolicy.isAv1Mime(mimeType)) {
+                        av1Count++;
+                    }
+                }
+            }
+            Logger.printInfo(() -> "AV1 format policy for " + videoId + ": "
+                    + codec + ", video formats " + videoCount + ", AV1 " + av1Count
+                    + ", total " + filtered.size());
+        }
+        return filtered;
     }
 
     private static boolean hasHardwareAv1Decoder() {
