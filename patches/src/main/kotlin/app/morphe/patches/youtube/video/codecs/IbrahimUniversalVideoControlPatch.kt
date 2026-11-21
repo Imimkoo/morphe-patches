@@ -11,7 +11,6 @@ import app.morphe.patches.youtube.layout.player.buttons.playerOverlayButtonsHook
 import app.morphe.patches.youtube.video.buffer.ibrahimBufferControlPatch
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
 import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
-import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 
 private const val IBRAHIM_CLASS =
     "Lapp/morphe/extension/youtube/videoplayer/IbrahimVideoControlButton;"
