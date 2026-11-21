@@ -15,14 +15,17 @@ import android.media.MediaCodecList;
 import android.os.Build;
 import android.view.Display;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.settings.SharedYouTubeSettings;
 import app.morphe.extension.shared.spoof.ClientType;
 import app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch;
+import app.morphe.extension.youtube.patches.VideoFormat.FormatInterface;
 import app.morphe.extension.youtube.settings.Settings;
 
 @SuppressWarnings({"unused", "deprecation", "RedundantSuppression"})
@@ -30,6 +33,8 @@ public class DisableVideoCodecsPatch {
 
     public enum VideoCodec {
         DEFAULT,
+        PREFER_AV1,
+        FORCE_AV1,
         VP9,
         AVC
     }
@@ -38,13 +43,6 @@ public class DisableVideoCodecsPatch {
      * Same as MediaFormat.MIMETYPE_VIDEO_AV1, which is only available with Android 10 and newer.
      */
     private static final String MIMETYPE_VIDEO_AV1 = "video/av01";
-
-    /**
-     * Resolved on first use and not in a static initializer, because the default value of
-     * {@link Settings#VIDEO_CODEC} comes from this class.
-     */
-    @Nullable
-    private static volatile VideoCodec videoCodec;
 
     private static final int[] EMPTY_ARRAY_INT = new int[0];
 
@@ -177,6 +175,80 @@ public class DisableVideoCodecsPatch {
         return false;
     }
 
+    public static boolean hasAnyAv1Decoder() {
+        return getAv1DecoderState().hasDecoder;
+    }
+
+    private static final class Av1DecoderState {
+        final boolean hasDecoder;
+        final List<MediaCodecInfo.VideoCapabilities> videoCapabilities;
+
+        Av1DecoderState(boolean hasDecoder, List<MediaCodecInfo.VideoCapabilities> videoCapabilities) {
+            this.hasDecoder = hasDecoder;
+            this.videoCapabilities = videoCapabilities;
+        }
+    }
+
+    @Nullable
+    private static volatile Av1DecoderState cachedAv1DecoderState;
+
+    private static Av1DecoderState getAv1DecoderState() {
+        Av1DecoderState state = cachedAv1DecoderState;
+        if (state != null) {
+            return state;
+        }
+
+        boolean found = false;
+        List<MediaCodecInfo.VideoCapabilities> capsList = new ArrayList<>();
+        try {
+            for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
+                if (info.isEncoder()) {
+                    continue;
+                }
+                for (String type : info.getSupportedTypes()) {
+                    if (MIMETYPE_VIDEO_AV1.equalsIgnoreCase(type)) {
+                        found = true;
+                        try {
+                            MediaCodecInfo.CodecCapabilities caps = info.getCapabilitiesForType(type);
+                            MediaCodecInfo.VideoCapabilities videoCaps = caps != null ? caps.getVideoCapabilities() : null;
+                            if (videoCaps != null) {
+                                capsList.add(videoCaps);
+                            }
+                        } catch (Exception ex) {
+                            Logger.printDebug(() -> "Failed to read VideoCapabilities for " + info.getName());
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            Logger.printException(() -> "getAv1DecoderState failure", ex);
+        }
+
+        state = new Av1DecoderState(found, capsList);
+        cachedAv1DecoderState = state;
+        return state;
+    }
+
+    private static boolean isAv1SizeSupported(int width, int height) {
+        Av1DecoderState state = getAv1DecoderState();
+        if (!state.hasDecoder) {
+            return false;
+        }
+        if (state.videoCapabilities.isEmpty() || width <= 0 || height <= 0) {
+            return true;
+        }
+        for (MediaCodecInfo.VideoCapabilities videoCaps : state.videoCapabilities) {
+            try {
+                if (videoCaps.isSizeSupported(width, height)
+                        || videoCaps.isSizeSupported(height, width)) {
+                    return true;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return false;
+    }
+
     private static VideoCodec resolveVideoCodec() {
         VideoCodec codec = Settings.VIDEO_CODEC.get();
         if (codec == VideoCodec.AVC && !isAvcAvailable()) {
@@ -189,19 +261,14 @@ public class DisableVideoCodecsPatch {
      * @return The codec in use, which is VP9 if AVC is selected but cannot be forced.
      */
     public static VideoCodec getVideoCodec() {
-        VideoCodec codec = videoCodec;
-        if (codec == null) {
-            codec = resolveVideoCodec();
-            videoCodec = codec;
-        }
-        return codec;
+        return resolveVideoCodec();
     }
 
     /**
      * Injection point.
      */
     public static boolean allowVP9() {
-        final boolean allowed = getVideoCodec() != VideoCodec.AVC;
+        final boolean allowed = VideoCodecPolicy.allowVP9(getVideoCodec().name());
         if (!allowed) {
             Logger.printVerbose(() -> "VP9 not allowed");
         }
@@ -212,10 +279,40 @@ public class DisableVideoCodecsPatch {
      * Injection point.
      */
     public static boolean allowCodec(String mimeType) {
-        final boolean allowed = !(getVideoCodec() == VideoCodec.VP9 && MIMETYPE_VIDEO_AV1.equals(mimeType));
+        final boolean allowed = VideoCodecPolicy.allowCodec(getVideoCodec().name(), mimeType);
         if (!allowed) {
             Logger.printVerbose(() -> "Codec not allowed: " + mimeType);
         }
         return allowed;
+    }
+
+    /**
+     * Injection point.
+     */
+    public static List<FormatInterface> filterAdaptiveFormats(@NonNull String videoId,
+                                                              @NonNull List<FormatInterface> adaptiveFormats) {
+        final VideoCodec codec = getVideoCodec();
+        if (codec != VideoCodec.PREFER_AV1 && codec != VideoCodec.FORCE_AV1) {
+            return adaptiveFormats;
+        }
+
+        try {
+            Av1DecoderState state = getAv1DecoderState();
+            List<FormatInterface> filtered = VideoCodecPolicy.filterAdaptiveFormats(
+                    codec.name(),
+                    adaptiveFormats,
+                    FormatInterface::patch_getMimeType,
+                    FormatInterface::patch_getWidth,
+                    FormatInterface::patch_getHeight,
+                    state.hasDecoder,
+                    DisableVideoCodecsPatch::isAv1SizeSupported
+            );
+            Logger.printDebug(() -> "AV1 filter (" + codec + ") for " + videoId
+                    + ": " + adaptiveFormats.size() + " -> " + filtered.size());
+            return filtered;
+        } catch (Exception ex) {
+            Logger.printException(() -> "filterAdaptiveFormats failure", ex);
+            return adaptiveFormats;
+        }
     }
 }

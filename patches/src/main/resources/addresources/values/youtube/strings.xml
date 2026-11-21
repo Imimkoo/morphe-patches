@@ -1841,11 +1841,21 @@ Limitations:
 • HDR still depends on the spoof video streams client"</string>
     <string name="morphe_video_codec_title">Video codec</string>
     <string name="morphe_video_codec_entry_default">Default</string>
+    <string name="morphe_video_codec_entry_prefer_av1">Prefer AV1</string>
+    <string name="morphe_video_codec_entry_force_av1">Force AV1 only</string>
     <string name="morphe_video_codec_entry_vp9" translatable="false">VP9</string>
     <string name="morphe_video_codec_entry_avc" translatable="false">AVC (H.264)</string>
     <!-- 'Spoof video streams' should be the same translation used for 'morphe_spoof_video_streams_screen_title'. -->
     <string name="morphe_video_codec_avc_not_available">To force AVC, change \'Spoof video streams\' to \'Android Studio\', \'Android VR\' or \'visionOS\'</string>
-    <string name="morphe_video_codec_user_dialog_message">"VP9
+    <string name="morphe_video_codec_user_dialog_message">"Prefer AV1
+• Prioritizes AV1 streams whenever available and supported by your device
+• Falls back to VP9 or AVC if AV1 is unavailable
+
+Force AV1 only
+• Allows only AV1 video streams with no VP9 or AVC fallback
+• Playback fails if a video has no AV1 stream
+
+VP9
 • Can improve battery life and fix playback stuttering
 • Uses more internet data than AV1
 
