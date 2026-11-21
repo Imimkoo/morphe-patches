@@ -221,7 +221,7 @@ public class DisableVideoCodecsPatch {
                     continue;
                 }
                 String mimeType = format.patch_getMimeType();
-                if (VideoCodecPolicy.isVideoMime(mimeType)) {
+                if (VideoCodecPolicy.isVideoMime(mimeType) || VideoCodecPolicy.isAv1Format(format)) {
                     videoCount++;
                     if (VideoCodecPolicy.isAv1Format(format)) {
                         av1Count++;
