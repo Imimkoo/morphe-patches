@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - dev
+      - ibrahim/universal-video-control
   pull_request:
     branches:
       - dev
