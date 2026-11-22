@@ -183,6 +183,7 @@ public final class IbrahimVideoControlButton {
 
             TextView liveInfo = new TextView(context);
             liveInfo.setText("\n" + currentVideoSummary()
+                    + "\n" + av1DecoderSummary()
                     + "\nالتغييرات تطبق أثناء قرارات التحميل؛ سياسة الترميز قد تتطلب إعادة تحميل الفيديو.");
             content.addView(liveInfo);
 
