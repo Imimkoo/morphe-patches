@@ -52,8 +52,6 @@ import java.util.ArrayList;\nimport java.util.List;
 
 import app.morphe.extension.shared.settings.Setting;
 import app.morphe.extension.shared.spoof.ClientType;
-import app.morphe.extension.youtube.patches.DisableVideoCodecsPatch;
-import app.morphe.extension.youtube.patches.DisableVideoCodecsPatch.VideoCodec;
 import app.morphe.extension.youtube.settings.Settings;\nimport app.morphe.extension.youtube.videoplayer.IbrahimVideoControlButton;
 
 @SuppressWarnings("unused")
