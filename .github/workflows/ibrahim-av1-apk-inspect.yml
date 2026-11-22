@@ -19,15 +19,36 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p av1-inspection
-          APK_URL="https://archive.org/download/jhc-apks/apks/com.google.android.youtube/com.google.android.youtube-21.30.216-arm64-v8a.apk"
+          BASE="https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
           EXPECTED_SHA256="3775a15129dcc4e5b80fc17b7e0841b7fdd1ca89a6e72baa798806f666c74d02"
-          curl --fail --location --retry 3 --retry-delay 3 --connect-timeout 20 --max-time 600 \
-            "$APK_URL" -o av1-inspection/youtube-stock.apk
-          ACTUAL_SHA256="$(sha256sum av1-inspection/youtube-stock.apk | cut -d' ' -f1)"
-          echo "Expected SHA256: $EXPECTED_SHA256"
-          echo "Actual SHA256:   $ACTUAL_SHA256"
-          test "$ACTUAL_SHA256" = "$EXPECTED_SHA256"
+          FOUND=0
+          for VARIANT in arm64-v8a all; do
+            URL="$BASE/com.google.android.youtube-21.30.216-$VARIANT.apk"
+            echo "Trying $URL"
+            if curl --fail --location --retry 1 --connect-timeout 20 --max-time 600 "$URL" -o "av1-inspection/candidate-$VARIANT.apk"; then
+              ACTUAL="$(sha256sum "av1-inspection/candidate-$VARIANT.apk" | cut -d' ' -f1)"
+              echo "$VARIANT SHA256=$ACTUAL"
+              if [ "$ACTUAL" = "$EXPECTED_SHA256" ]; then
+                mv "av1-inspection/candidate-$VARIANT.apk" av1-inspection/youtube-stock.apk
+                echo "SOURCE_VARIANT=$VARIANT" | tee av1-inspection/source.txt
+                FOUND=1
+                break
+              fi
+            fi
+            rm -f "av1-inspection/candidate-$VARIANT.apk"
+          done
+          if [ "$FOUND" != 1 ]; then
+            curl --fail --location --retry 2 --connect-timeout 20 --max-time 120 \
+              "https://archive.org/metadata/jhc-apks" -o av1-inspection/archive-metadata.json || true
+            if [ -s av1-inspection/archive-metadata.json ]; then
+              jq -r '.files[] | select(.name | contains("com.google.android.youtube") and contains("21.30.216")) | [.name, (.size // ""), (.sha256 // "")] | @tsv' \
+                av1-inspection/archive-metadata.json | tee av1-inspection/archive-candidates.txt || true
+            fi
+            echo "SOURCE_APK_NOT_FOUND_OR_HASH_MISMATCH" | tee av1-inspection/result.txt
+            exit 1
+          fi
           file av1-inspection/youtube-stock.apk
+          sha256sum av1-inspection/youtube-stock.apk | tee av1-inspection/sha256.txt
           unzip -l av1-inspection/youtube-stock.apk | tee av1-inspection/apk-contents.txt | tail -n 35
 
       - name: Inspect DEX player and decoder references
@@ -47,6 +68,7 @@ jobs:
           } | tee av1-inspection/player-decoder-references.txt
 
       - name: Upload verified source and inspection report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: youtube-21.30.216-stock-av1-inspection
