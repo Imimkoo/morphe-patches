@@ -50,7 +50,12 @@ jobs:
             com.google.android.exoplayer.youtube.mediacodec.Dav1dDecoderHelper \
             androidx.media3.decoder.av1.Dav1dDecoder \
             androidx.media3.decoder.av1.Dav1dLibrary \
-            androidx.media3.decoder.av1.Libdav1dVideoRenderer; do
+            androidx.media3.decoder.av1.Libdav1dVideoRenderer \\
+            defpackage.sun \\
+            defpackage.suq \\
+            defpackage.aotq \\
+            defpackage.aokj \\
+            defpackage.aosz; do
             SAFE="${CLASS//./_}"
             echo "===== $CLASS =====" | tee -a av1-source/summary.txt
             jadx/bin/jadx --no-res --threads-count 4 --single-class "$CLASS" \
