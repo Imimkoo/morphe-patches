@@ -754,6 +754,14 @@ public class StreamingDataRequest {
                 return null;
             }
 
+            // Diagnostic: distinguish a server response without AV1 from a player/decoder
+            // that receives AV1 but chooses another format.
+            for (Format format : streamingData.getAdaptiveFormatsList()) {
+                Logger.printDebug(() -> "Spoof format [" + clientType + "]: mime="
+                        + format.getMimeType() + ", itag=" + format.getItag()
+                        + ", size=" + format.getWidth() + "x" + format.getHeight());
+            }
+
             // In YouTube 20.21.37, manifestless live streams cannot be played using the SABR protocol, or there are playback issues.
             // Until code to assemble the manifestUrl is implemented or code to override the exoPlayerConfig is ready,
             // TV SABR clients in live streams will be temporarily fallbacked to TV DASH clients.
