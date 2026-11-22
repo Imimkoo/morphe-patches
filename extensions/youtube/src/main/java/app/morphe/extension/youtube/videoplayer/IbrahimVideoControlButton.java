@@ -5,22 +5,29 @@
 package app.morphe.extension.youtube.videoplayer;
 
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.content.Context;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.os.Build;
 import android.view.View;
+import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
+import app.morphe.extension.shared.spoof.requests.StreamingDataRequest;
 import app.morphe.extension.shared.spoof.ClientType;
 import app.morphe.extension.youtube.patches.VideoInformation;
 
@@ -192,6 +199,11 @@ public final class IbrahimVideoControlButton {
                     + "\nالتغييرات تطبق أثناء قرارات التحميل؛ سياسة الترميز قد تتطلب إعادة تحميل الفيديو.");
             content.addView(liveInfo);
 
+            Button diagnosticButton = new Button(context);
+            diagnosticButton.setText("جمع تقرير تشخيص الفيديو");
+            diagnosticButton.setOnClickListener(view -> runDiagnostic(context));
+            content.addView(diagnosticButton);
+
             new AlertDialog.Builder(context)
                     .setTitle("إبراهيم · التحكم في الفيديو")
                     .setView(content)
@@ -224,10 +236,128 @@ public final class IbrahimVideoControlButton {
     }
 
 
-    /** Reports the AV1 decoders actually exposed by Android on this device. */
+    /**
+     * Collects diagnostics only after an explicit user tap. No background polling or
+     * periodic codec scans are performed.
+     */
+    private static void runDiagnostic(Context context) {
+        final AlertDialog progress = new AlertDialog.Builder(context)
+                .setTitle("تشخيص الفيديو")
+                .setMessage("جاري فحص الجهاز ومعلومات التشغيل...")
+                .setCancelable(false)
+                .create();
+        progress.show();
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            String report = buildDiagnosticReport(context);
+            progress.dismiss();
+
+            TextView reportView = new TextView(context);
+            int pad = (int) (16 * context.getResources().getDisplayMetrics().density);
+            reportView.setPadding(pad, pad, pad, pad);
+            reportView.setTextIsSelectable(true);
+            reportView.setText(report);
+
+            ScrollView scroll = new ScrollView(context);
+            scroll.addView(reportView);
+            new AlertDialog.Builder(context)
+                    .setTitle("تقرير تشخيص الفيديو")
+                    .setView(scroll)
+                    .setPositiveButton("نسخ التقرير", (dialog, which) -> {
+                        ClipboardManager clipboard = (ClipboardManager)
+                                context.getSystemService(Context.CLIPBOARD_SERVICE);
+                        if (clipboard != null) {
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Ibrahim video diagnostics", report));
+                            Utils.showToastShort("تم نسخ التقرير");
+                        }
+                    })
+                    .setNegativeButton("إغلاق", null)
+                    .show();
+        }, 1800L);
+    }
+
+    private static String buildDiagnosticReport(Context context) {
+        StringBuilder out = new StringBuilder(4096);
+        out.append("IBRAHIM VIDEO DIAGNOSTIC v1\\n");
+        out.append("Collected: ").append(new java.util.Date()).append("\\n");
+        out.append("\\n[APP]\\n");
+        try {
+            PackageInfo info = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+            out.append("package=").append(context.getPackageName()).append("\\n");
+            out.append("versionName=").append(info.versionName).append("\\n");
+            if (Build.VERSION.SDK_INT >= 28) out.append("versionCode=").append(info.getLongVersionCode()).append("\\n");
+            else out.append("versionCode=").append(info.versionCode).append("\\n");
+        } catch (Exception ex) {
+            out.append("packageInfoError=").append(ex.getClass().getSimpleName()).append("\\n");
+        }
+
+        out.append("\\n[DEVICE]\\n")
+                .append("manufacturer=").append(Build.MANUFACTURER).append("\\n")
+                .append("model=").append(Build.MODEL).append("\\n")
+                .append("device=").append(Build.DEVICE).append("\\n")
+                .append("product=").append(Build.PRODUCT).append("\\n")
+                .append("hardware=").append(Build.HARDWARE).append("\\n")
+                .append("board=").append(Build.BOARD).append("\\n")
+                .append("socModel=").append(Build.VERSION.SDK_INT >= 31 ? Build.SOC_MODEL : "API<31").append("\\n")
+                .append("android=").append(Build.VERSION.RELEASE).append("\\n")
+                .append("sdk=").append(Build.VERSION.SDK_INT).append("\\n")
+                .append("supportedAbis=").append(java.util.Arrays.toString(Build.SUPPORTED_ABIS)).append("\\n");
+
+        out.append("\\n[CURRENT VIDEO]\\n")
+                .append(currentVideoSummary()).append("\\n")
+                .append("spoofClient=").append(StreamingDataRequest.getLastSpoofedClientName()).append("\\n")
+                .append("streamResponseFormats=\\n")
+                .append(StreamingDataRequest.getLastStreamFormatsSummary()).append("\\n");
+
+        out.append("\\n[ANDROID MEDIA CODECS]\\n");
+        try {
+            MediaCodecInfo[] codecs = new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos();
+            int found = 0;
+            for (MediaCodecInfo codec : codecs) {
+                if (codec.isEncoder()) continue;
+                for (String type : codec.getSupportedTypes()) {
+                    String mime = type.toLowerCase(Locale.ROOT);
+                    if (!mime.startsWith("video/")) continue;
+                    if (!(mime.equals("video/av01") || mime.equals("video/x-vnd.on2.vp9")
+                            || mime.equals("video/avc") || mime.equals("video/hevc")
+                            || mime.equals("video/x-vnd.on2.vp8"))) continue;
+                    found++;
+                    out.append(codec.getName()).append(" | ").append(mime);
+                    if (Build.VERSION.SDK_INT >= 29) {
+                        out.append(" | ").append(codec.isHardwareAccelerated() ? "HW" : "SW")
+                                .append(" | vendor=").append(codec.isVendor());
+                    }
+                    try {
+                        MediaCodecInfo.CodecCapabilities caps = codec.getCapabilitiesForType(type);
+                        MediaCodecInfo.VideoCapabilities video = caps.getVideoCapabilities();
+                        if (video != null) {
+                            out.append(" | 480p30=").append(video.areSizeAndRateSupported(854, 480, 30))
+                                    .append(" | 720p30=").append(video.areSizeAndRateSupported(1280, 720, 30))
+                                    .append(" | 720p60=").append(video.areSizeAndRateSupported(1280, 720, 60))
+                                    .append(" | 1080p30=").append(video.areSizeAndRateSupported(1920, 1080, 30));
+                        }
+                    } catch (Exception capError) {
+                        out.append(" | capabilityError=").append(capError.getClass().getSimpleName());
+                    }
+                    out.append("\\n");
+                }
+            }
+            out.append("videoDecoderEntries=").append(found).append("\\n");
+        } catch (Exception ex) {
+            out.append("codecScanError=").append(ex.getClass().getSimpleName()).append(": ")
+                    .append(ex.getMessage()).append("\\n");
+        }
+
+        out.append("\\n[IMPORTANT]\\n")
+                .append("Codec inventory means Android advertises a decoder; it does NOT prove a frame was decoded.\\n")
+                .append("streamResponseFormats are formats offered by the last spoof response, not necessarily the selected track.\\n")
+                .append("No continuous monitoring or background collection is active.\\n");
+        return out.toString();
+    }
+
+    /** Reports the AV1 decoders Android advertises; this is inventory, not a decode test. */
     private static String av1DecoderSummary() {
         try {
-            StringBuilder result = new StringBuilder("AV1 decoder(s): ");
+            StringBuilder result = new StringBuilder("مفككات AV1 التي يعلن عنها النظام: ");
             int count = 0;
             for (MediaCodecInfo codec : new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos()) {
                 if (codec.isEncoder()) continue;
@@ -241,9 +371,9 @@ public final class IbrahimVideoControlButton {
                     }
                 }
             }
-            return count == 0 ? "AV1 decoder(s): لا يوجد مفكك AV1 ظاهر عبر MediaCodec" : result.toString();
+            return count == 0 ? "لا يوجد مفكك AV1 معلن عبر MediaCodec" : result.toString();
         } catch (Exception ex) {
-            return "AV1 decoder(s): تعذر فحص MediaCodec (" + ex.getClass().getSimpleName() + ")";
+            return "تعذر فحص MediaCodec (" + ex.getClass().getSimpleName() + ")";
         }
     }
 
