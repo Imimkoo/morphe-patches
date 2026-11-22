@@ -759,7 +759,7 @@ public class StreamingDataRequest {
             for (Format format : streamingData.getAdaptiveFormatsList()) {
                 Logger.printDebug(() -> "Spoof format [" + clientType + "]: mime="
                         + format.getMimeType() + ", itag=" + format.getItag()
-                        + ", size=" + format.getWidth() + "x" + format.getHeight());
+                        + ", itag=" + format.getItag());
             }
 
             // In YouTube 20.21.37, manifestless live streams cannot be played using the SABR protocol, or there are playback issues.
