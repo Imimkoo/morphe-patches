@@ -23,6 +23,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.util.Locale;
+import java.lang.reflect.Method;
 
 import androidx.annotation.Nullable;
 
@@ -201,7 +202,7 @@ public final class IbrahimVideoControlButton {
             content.addView(liveInfo);
 
             Button decoderProbeButton = new Button(context);
-            decoderProbeButton.setText("اختبار مفككات AV1");
+            decoderProbeButton.setText("اختبار مفكك AV1 المدمج داخل التطبيق");
             decoderProbeButton.setOnClickListener(view -> IbrahimAv1DecoderProbe.run(context));
             content.addView(decoderProbeButton);
 
@@ -314,7 +315,10 @@ public final class IbrahimVideoControlButton {
                 .append("streamResponseFormats=\\n")
                 .append(StreamingDataRequest.getLastStreamFormatsSummary()).append("\\n");
 
-        out.append("\\n[ANDROID MEDIA CODECS]\\n");
+        out.append("\\n[EMBEDDED APP AV1 DECODER]\\n")
+                .append(av1DecoderSummary()).append("\\n")
+                .append("AV1 playback uses the APK-bundled dav1d JNI library, not Android MediaCodec.\\n");
+        out.append("\\n[SYSTEM MEDIA CODECS - INFO ONLY; NOT USED BY EMBEDDED AV1]\\n");
         try {
             MediaCodecInfo[] codecs = new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos();
             int found = 0;
@@ -361,25 +365,20 @@ public final class IbrahimVideoControlButton {
     }
 
     /** Reports the AV1 decoders Android advertises; this is inventory, not a decode test. */
+    /** Reports the app-bundled dav1d library, not codecs provided by the phone. */
     private static String av1DecoderSummary() {
         try {
-            StringBuilder result = new StringBuilder("مفككات AV1 التي يعلن عنها النظام: ");
-            int count = 0;
-            for (MediaCodecInfo codec : new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos()) {
-                if (codec.isEncoder()) continue;
-                for (String type : codec.getSupportedTypes()) {
-                    if ("video/av01".equalsIgnoreCase(type)) {
-                        if (count++ > 0) result.append(", ");
-                        result.append(codec.getName());
-                        if (Build.VERSION.SDK_INT >= 29) {
-                            result.append(codec.isHardwareAccelerated() ? " [HW]" : " [SW]");
-                        }
-                    }
-                }
-            }
-            return count == 0 ? "لا يوجد مفكك AV1 معلن عبر MediaCodec" : result.toString();
-        } catch (Exception ex) {
-            return "تعذر فحص MediaCodec (" + ex.getClass().getSimpleName() + ")";
+            Class<?> library = Class.forName("androidx.media3.decoder.av1.Dav1dLibrary");
+            Method available = library.getMethod("a");
+            boolean loaded = Boolean.TRUE.equals(available.invoke(null));
+            Class.forName("androidx.media3.decoder.av1.Dav1dDecoder");
+            Class.forName("androidx.media3.decoder.av1.Libdav1dVideoRenderer");
+            return "مفكك dav1d المدمج داخل التطبيق: "
+                    + (loaded ? "متاح ومحمّل" : "غير متاح")
+                    + " | Decoder وRenderer موجودان داخل APK";
+        } catch (Throwable ex) {
+            return "فحص مفكك dav1d المدمج فشل: " + ex.getClass().getSimpleName()
+                    + ": " + String.valueOf(ex.getMessage());
         }
     }
 
