@@ -13,7 +13,7 @@ permissions:
 jobs:
   decompile:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
       - name: Download verified stock APK artifact
         uses: actions/download-artifact@v4
@@ -40,40 +40,39 @@ jobs:
           chmod +x jadx/bin/jadx
           jadx/bin/jadx --version
 
-      - name: Decompile YouTube and extract AV1 implementation
+      - name: Decompile AV1 classes only
         shell: bash
         run: |
           set -euo pipefail
           APK="source/youtube-stock.apk"
-          test -s "$APK"
-          mkdir -p decompiled
-          jadx/bin/jadx --no-res --threads-count 8 --show-bad-code -d decompiled "$APK" 2>&1 | tee jadx.log
           mkdir -p av1-source
-          grep -RIlE 'CODEC_SPLICE_DAV1D|Dav1dDecoderHelper|sf_swap\.dav1d|DISABLE_DAV1D|DAV1D_SAME_CONDITION|Libdav1dVideoRenderer|dav1dJNI' decompiled/sources \
-            | sort > av1-source/matching-classes.txt || true
-          while IFS= read -r file; do
-            [ -n "$file" ] || continue
-            {
-              echo
-              echo "===== $file ====="
-              sed -n '1,1200p' "$file"
-            } >> av1-source/av1-implementation-source.txt
-          done < av1-source/matching-classes.txt
-          echo "=== Embedded dav1d native library ===" | tee av1-source/native-library.txt
+          for CLASS in \
+            com.google.android.exoplayer.youtube.mediacodec.Dav1dDecoderHelper \
+            androidx.media3.decoder.av1.Dav1dDecoder \
+            androidx.media3.decoder.av1.Dav1dLibrary \
+            androidx.media3.decoder.av1.Libdav1dVideoRenderer; do
+            SAFE="${CLASS//./_}"
+            echo "===== $CLASS =====" | tee -a av1-source/summary.txt
+            jadx/bin/jadx --no-res --threads-count 4 --single-class "$CLASS" \
+              --single-class-output "av1-source/$SAFE.java" "$APK" 2>&1 | tee -a av1-source/jadx.log || true
+          done
           unzip -p "$APK" lib/arm64-v8a/libdav1dJNI.so > av1-source/libdav1dJNI.so
-          sha256sum av1-source/libdav1dJNI.so | tee -a av1-source/native-library.txt
-          file av1-source/libdav1dJNI.so | tee -a av1-source/native-library.txt
-          readelf -d av1-source/libdav1dJNI.so | tee -a av1-source/native-library.txt || true
-          echo "=== Match summary ==="
-          cat av1-source/matching-classes.txt
-          wc -l av1-source/av1-implementation-source.txt
+          sha256sum av1-source/libdav1dJNI.so > av1-source/native-sha256.txt
+          file av1-source/libdav1dJNI.so > av1-source/native-file.txt
+          {
+            echo "=== Extracted Java source files ==="
+            find av1-source -maxdepth 1 -name '*.java' -print
+            echo "=== Helper/renderer source preview ==="
+            for f in av1-source/*.java; do
+              echo "===== $f ====="
+              sed -n '1,1200p' "$f"
+            done
+          } | tee av1-source/report.txt
 
       - name: Upload AV1 implementation source
         uses: actions/upload-artifact@v4
         with:
           name: youtube-21.30.216-av1-source-code
-          path: |
-            av1-source/
-            jadx.log
+          path: av1-source/
           if-no-files-found: error
           retention-days: 14
