@@ -76,7 +76,7 @@ public final class IbrahimVideoControlButton {
 
     public static ClientType getPreferredAv1Client(ClientType requested) {
         Context context = getContext();
-        if (context == null) return ClientType.TV_SIMPLY;
+        if (context == null) return ClientType.VISIONOS_1_06_AV1;
         if (isAudioOnly(context) || getMode(context) == DEFAULT) return requested;
         // Prefer the AV1-capable visionOS device profile that does not require the
         // JavaScript/PoToken path used by TV_SIMPLY. TV_SIMPLY and TV_SABR can be
