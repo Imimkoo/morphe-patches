@@ -78,12 +78,17 @@ public final class IbrahimVideoControlButton {
         Context context = getContext();
         if (context == null) return ClientType.TV_SIMPLY;
         if (isAudioOnly(context) || getMode(context) == DEFAULT) return requested;
-        if (requested == ClientType.ANDROID_VR_SABR) return ClientType.ANDROID_XR_SABR;
-        if (requested == ClientType.ANDROID_VR_DASH) return ClientType.ANDROID_XR_DASH;
-        if (requested == ClientType.ANDROID_VR_EXPERIMENTAL) return ClientType.ANDROID_XR_EXPERIMENTAL;
-        if (requested == ClientType.VISIONOS_1_02) return ClientType.VISIONOS_1_03;
-        if (requested == ClientType.VISIONOS_1_06) return ClientType.VISIONOS_1_06_AV1;
-        return ClientType.TV_SIMPLY;
+        // Prefer the AV1-capable visionOS device profile that does not require the
+        // JavaScript/PoToken path used by TV_SIMPLY. TV_SIMPLY and TV_SABR can be
+        // skipped entirely when the embedded JS engine is unavailable.
+        if (requested == ClientType.ANDROID_VR_SABR
+                || requested == ClientType.ANDROID_VR_DASH
+                || requested == ClientType.ANDROID_VR_EXPERIMENTAL) {
+            return ClientType.ANDROID_XR_EXPERIMENTAL;
+        }
+        // The 1.06 AV1 profile deliberately uses the 17,1 device model that YouTube
+        // documents as receiving AV1 streams, while retaining the no-JS visionOS path.
+        return ClientType.VISIONOS_1_06_AV1;
     }
 
     private static boolean isBufferEnabled(Context context) {
