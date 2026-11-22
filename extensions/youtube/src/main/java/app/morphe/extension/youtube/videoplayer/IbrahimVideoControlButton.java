@@ -63,13 +63,26 @@ public final class IbrahimVideoControlButton {
     }
 
     private static Context getContext() {
-        Context context = appContext;\n        return context != null ? context : Utils.getContext();\n    }
+        Context context = appContext;
+        return context != null ? context : Utils.getContext();
+    }
 
     private static boolean isAudioOnly(Context context) {
-        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(AUDIO_ONLY_KEY, false);\n    }
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(AUDIO_ONLY_KEY, false);
+    }
 
     public static ClientType getPreferredAv1Client(ClientType requested) {
-        Context context = getContext();\n        if (context == null || getMode(context) == DEFAULT) return requested;\n        if (requested == ClientType.ANDROID_VR_SABR) return ClientType.ANDROID_XR_SABR;\n        if (requested == ClientType.ANDROID_VR_DASH) return ClientType.ANDROID_XR_DASH;\n        if (requested == ClientType.ANDROID_VR_EXPERIMENTAL) return ClientType.ANDROID_XR_EXPERIMENTAL;\n        if (requested == ClientType.VISIONOS_1_02) return ClientType.VISIONOS_1_03;\n        if (requested == ClientType.VISIONOS_1_06) return ClientType.VISIONOS_1_06_AV1;\n        return ClientType.TV_SIMPLY;\n    }\n\n    private static boolean isBufferEnabled(Context context) {
+        Context context = getContext();
+        if (context == null || getMode(context) == DEFAULT) return requested;
+        if (requested == ClientType.ANDROID_VR_SABR) return ClientType.ANDROID_XR_SABR;
+        if (requested == ClientType.ANDROID_VR_DASH) return ClientType.ANDROID_XR_DASH;
+        if (requested == ClientType.ANDROID_VR_EXPERIMENTAL) return ClientType.ANDROID_XR_EXPERIMENTAL;
+        if (requested == ClientType.VISIONOS_1_02) return ClientType.VISIONOS_1_03;
+        if (requested == ClientType.VISIONOS_1_06) return ClientType.VISIONOS_1_06_AV1;
+        return ClientType.TV_SIMPLY;
+    }
+
+    private static boolean isBufferEnabled(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .getBoolean(BUFFER_ENABLED_KEY, true);
     }
@@ -213,7 +226,7 @@ public final class IbrahimVideoControlButton {
 
     /** Hook: controls whether YouTube may use VP9. */
     public static boolean allowVP9() {
-        Context context = appContext;
+        Context context = getContext();
         return context == null || getMode(context) == DEFAULT;
     }
 
@@ -222,8 +235,12 @@ public final class IbrahimVideoControlButton {
      * Audio codecs are deliberately left untouched.
      */
     public static boolean allowCodec(String mimeType) {
-        Context context = appContext;
-        if (context == null || getMode(context) != FORCE_AV1_ONLY) return true;
+        Context context = getContext();
+        if (context == null) return true;
+        if (isAudioOnly(context)) {
+            return mimeType == null || !mimeType.toLowerCase(java.util.Locale.ROOT).startsWith("video/");
+        }
+        if (getMode(context) != FORCE_AV1_ONLY) return true;
         if (mimeType == null || !mimeType.toLowerCase(java.util.Locale.ROOT).startsWith("video/")) {
             return true;
         }
@@ -235,7 +252,7 @@ public final class IbrahimVideoControlButton {
      * and resume only after buffered duration falls to Resume.
      */
     public static long applyBufferPolicy(long bufferedUs) {
-        Context context = appContext;
+        Context context = getContext();
         if (context == null || !isBufferEnabled(context)) {
             bufferThrottled = false;
             return bufferedUs;
