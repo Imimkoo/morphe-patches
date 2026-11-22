@@ -9,6 +9,7 @@ import app.morphe.patcher.patch.patch
 import app.morphe.patches.youtube.layout.player.buttons.addPlayerBottomButton
 import app.morphe.patches.youtube.layout.player.buttons.playerOverlayButtonsHookPatch
 import app.morphe.patches.youtube.video.buffer.ibrahimBufferControlPatch
+import app.morphe.patches.youtube.misc.spoof.spoofVideoStreamsPatch
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
 import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 
@@ -21,10 +22,11 @@ private const val IBRAHIM_CLASS =
  */
 val ibrahimUniversalVideoControlPatch = patch(
     name = "Ibrahim: Universal video control",
-    description = "Adds an independent player control for Default, Prefer AV1, and Force AV1-only policies."
+    description = "Adds Ibrahim controls, AV1-first spoof client selection, and independent buffer policy."
 ) {
     dependsOn(
         sharedExtensionPatch,
+        spoofVideoStreamsPatch,
         playerOverlayButtonsHookPatch,
         ibrahimBufferControlPatch
     )
