@@ -32,13 +32,14 @@ public class SpoofVideoStreamsPatch {
         ClientType requestedClient = Settings.SPOOF_VIDEO_STREAMS_CLIENT_TYPE.get();
         ClientType preferredClient = IbrahimVideoControlButton.getPreferredAv1Client(requestedClient);
 
-        List<ClientType> availableClients = new ArrayList<>(List.of(
-                // Keep a JavaScript-independent AV1 candidate available even when the
-                // selected Android XR profile requires OAuth and cannot be used.
-                ClientType.VISIONOS_1_06_AV1,
-                ClientType.TV_SABR,
-                ClientType.ANDROID_CREATOR
-        ));
+        List<ClientType> availableClients = new ArrayList<>();
+        // Add a JavaScript-independent AV1 fallback only when AV1 preference is enabled.
+        // In Default mode, preserve Morphe's original client ordering.
+        if (preferredClient != requestedClient && preferredClient != ClientType.VISIONOS_1_06_AV1) {
+            availableClients.add(ClientType.VISIONOS_1_06_AV1);
+        }
+        availableClients.add(ClientType.TV_SABR);
+        availableClients.add(ClientType.ANDROID_CREATOR);
         if (!availableClients.contains(requestedClient) && requestedClient != preferredClient) {
             availableClients.add(requestedClient);
         }
