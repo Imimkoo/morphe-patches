@@ -1,10 +1,9 @@
 /*
  * Copyright 2026.
- * Ibrahim AV1 decoder preflight diagnostics.
+ * Ibrahim embedded dav1d runtime diagnostics.
  *
- * This probes Android MediaCodec decoder creation/configuration/startup.
- * It deliberately does not report a successful frame decode: a real AV1
- * access unit must be supplied to prove that the decoder can decode frames.
+ * Tests the AV1 decoder shipped inside the YouTube APK. It does not create
+ * or depend on an Android MediaCodec decoder supplied by the phone.
  */
 package app.morphe.extension.youtube.videoplayer;
 
@@ -12,38 +11,23 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
-import android.media.MediaCodec;
-import android.media.MediaCodecInfo;
-import android.media.MediaCodecList;
-import android.media.MediaFormat;
-import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 
-/** Runtime preflight for the AV1 decoder candidates on this Android device. */
+/** Runtime preflight for the APK-bundled Media3 dav1d decoder. */
 public final class IbrahimAv1DecoderProbe {
-    private static final String MIME_AV1 = "video/av01";
-    private static final String[] PREFERRED_NAMES = {
-            "c2.android.av1-dav1d.decoder",
-            "c2.android.av1.decoder",
-            "c2.qti.av1.decoder"
-    };
-
     private IbrahimAv1DecoderProbe() {}
 
     public static void run(Context context) {
         final Context app = context.getApplicationContext();
         final AlertDialog progress = new AlertDialog.Builder(context)
-                .setTitle("اختبار مفككات AV1")
-                .setMessage("جاري اختبار إنشاء وتهيئة وتشغيل المفككات...")
+                .setTitle("اختبار مفكك dav1d المدمج")
+                .setMessage("جاري اختبار المكتبة الموجودة داخل التطبيق...")
                 .setCancelable(false)
                 .create();
         progress.show();
@@ -60,117 +44,67 @@ public final class IbrahimAv1DecoderProbe {
                 ScrollView scroll = new ScrollView(context);
                 scroll.addView(text);
                 new AlertDialog.Builder(context)
-                        .setTitle("نتيجة اختبار مفككات AV1")
+                        .setTitle("نتيجة اختبار dav1d المدمج")
                         .setView(scroll)
                         .setPositiveButton("نسخ التقرير", (dialog, which) -> {
                             ClipboardManager clipboard = (ClipboardManager)
                                     app.getSystemService(Context.CLIPBOARD_SERVICE);
                             if (clipboard != null) {
-                                clipboard.setPrimaryClip(ClipData.newPlainText("AV1 decoder preflight", report));
+                                clipboard.setPrimaryClip(ClipData.newPlainText("Embedded dav1d test", report));
                             }
                         })
                         .setNegativeButton("إغلاق", null)
                         .show();
             });
-        }, "Ibrahim-AV1-Probe").start();
+        }, "Ibrahim-Embedded-dav1d-Probe").start();
     }
 
     private static String runTests() {
-        StringBuilder out = new StringBuilder(4096);
-        out.append("IBRAHIM AV1 DECODER PREFLIGHT v1\n");
-        out.append("Android SDK: ").append(Build.VERSION.SDK_INT).append("\n");
-        out.append("MIME: ").append(MIME_AV1).append("\n");
-        out.append("Test format: 640x360, 30fps\n");
-        out.append("NOTE: no AV1 bitstream is queued; DECODE_FRAME is intentionally NOT_TESTED.\n\n");
+        StringBuilder out = new StringBuilder(2048);
+        out.append("IBRAHIM EMBEDDED DAV1D TEST v1\n");
+        out.append("Decoder source: APK-bundled libdav1dJNI.so\n");
+        out.append("Android MediaCodec: NOT USED\n");
 
-        Map<String, MediaCodecInfo> available = new LinkedHashMap<>();
+        Object decoder = null;
         try {
-            for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos()) {
-                if (info.isEncoder()) continue;
-                for (String type : info.getSupportedTypes()) {
-                    if (MIME_AV1.equalsIgnoreCase(type)) {
-                        available.put(info.getName(), info);
-                        break;
-                    }
-                }
+            Class<?> libraryClass = Class.forName("androidx.media3.decoder.av1.Dav1dLibrary");
+            Method availableMethod = libraryClass.getMethod("a");
+            boolean available = Boolean.TRUE.equals(availableMethod.invoke(null));
+            out.append("DAV1D_LIBRARY_LOAD=").append(available ? "PASS" : "FAIL").append("\n");
+            if (!available) {
+                out.append("DECODER_INIT=NOT_RUN_LIBRARY_UNAVAILABLE\n");
+                return out.toString();
             }
-        } catch (Exception error) {
-            out.append("INVENTORY=ERROR ").append(error.getClass().getSimpleName())
-                    .append(": ").append(error.getMessage()).append("\n");
-            return out.toString();
-        }
 
-        if (available.isEmpty()) {
-            out.append("RESULT=NO_AV1_DECODER_ADVERTISED\n");
-            return out.toString();
-        }
+            Class<?> decoderClass = Class.forName("androidx.media3.decoder.av1.Dav1dDecoder");
+            Constructor<?> constructor = decoderClass.getConstructor(
+                    int.class, int.class, int.class, int.class, int.class, boolean.class);
 
-        out.append("[ADVERTISED DECODERS]\n");
-        for (Map.Entry<String, MediaCodecInfo> entry : available.entrySet()) {
-            MediaCodecInfo info = entry.getValue();
-            out.append(entry.getKey());
-            if (Build.VERSION.SDK_INT >= 29) {
-                out.append(" | ").append(info.isHardwareAccelerated() ? "HW" : "SW")
-                        .append(" | vendor=").append(info.isVendor());
-            }
-            out.append("\n");
-        }
+            // 2 input buffers, 2 output buffers, 64 KiB initial input buffer,
+            // 2 dav1d worker threads, 2-frame delay, default allocator.
+            decoder = constructor.newInstance(2, 2, 65536, 2, 2, false);
+            out.append("DECODER_INIT=PASS\n");
+            Object name = decoderClass.getMethod("getName").invoke(decoder);
+            out.append("DECODER_NAME=").append(String.valueOf(name)).append("\n");
 
-        List<String> ordered = new ArrayList<>();
-        for (String preferred : PREFERRED_NAMES) {
-            if (available.containsKey(preferred)) ordered.add(preferred);
-        }
-        for (String name : available.keySet()) {
-            if (!ordered.contains(name)) ordered.add(name);
-        }
-
-        out.append("\n[ORDERED RUNTIME TESTS]\n");
-        boolean lifecycleSuccess = false;
-        for (String name : ordered) {
-            out.append("\nDECODER=").append(name).append("\n");
-            MediaCodec codec = null;
-            boolean created = false;
-            boolean configured = false;
-            boolean started = false;
-            try {
-                codec = MediaCodec.createByCodecName(name);
-                created = true;
-                out.append("CREATE_BY_NAME=PASS\n");
-
-                MediaFormat format = MediaFormat.createVideoFormat(MIME_AV1, 640, 360);
-                format.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
-                format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 512 * 1024);
-                codec.configure(format, null, null, 0);
-                configured = true;
-                out.append("CONFIGURE=PASS\n");
-
-                codec.start();
-                started = true;
-                lifecycleSuccess = true;
-                out.append("START=PASS\n");
-                out.append("DECODE_FRAME=NOT_TESTED_NO_AV1_ACCESS_UNIT\n");
-            } catch (Throwable error) {
-                out.append("CREATE_BY_NAME=").append(created ? "PASS" : "FAIL").append("\n");
-                out.append("CONFIGURE=").append(configured ? "PASS" : "FAIL").append("\n");
-                out.append("START=").append(started ? "PASS" : "FAIL").append("\n");
-                out.append("ERROR=").append(error.getClass().getName())
-                        .append(": ").append(String.valueOf(error.getMessage())).append("\n");
-            } finally {
-                if (codec != null) {
-                    try {
-                        if (started) codec.stop();
-                    } catch (Exception ignored) {}
-                    try {
-                        codec.release();
-                    } catch (Exception ignored) {}
-                }
+            decoderClass.getMethod("release").invoke(decoder);
+            decoder = null;
+            out.append("DECODER_RELEASE=PASS\n");
+            out.append("DECODE_FRAME=NOT_TESTED_NO_AV1_ACCESS_UNIT\n");
+            out.append("Meaning: native dav1d initialized successfully inside the APK; frame decode and playback still require a real stream test.\n");
+        } catch (Throwable error) {
+            Throwable cause = error;
+            while (cause.getCause() != null && cause.getCause() != cause) cause = cause.getCause();
+            out.append("RESULT=FAIL\n");
+            out.append("ERROR=").append(cause.getClass().getName())
+                    .append(": ").append(String.valueOf(cause.getMessage())).append("\n");
+        } finally {
+            if (decoder != null) {
+                try {
+                    decoder.getClass().getMethod("release").invoke(decoder);
+                } catch (Throwable ignored) {}
             }
         }
-
-        out.append("\n[SUMMARY]\n");
-        out.append("LIFECYCLE_PREFLIGHT=").append(lifecycleSuccess ? "AT_LEAST_ONE_PASS" : "ALL_FAILED").append("\n");
-        out.append("DECODE_FRAME=NOT_TESTED\n");
-        out.append("Meaning: PASS proves create/configure/start only; it does not prove AV1 frame decoding or playback performance.\n");
         return out.toString();
     }
 }
