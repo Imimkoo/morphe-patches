@@ -73,7 +73,8 @@ public final class IbrahimVideoControlButton {
 
     public static ClientType getPreferredAv1Client(ClientType requested) {
         Context context = getContext();
-        if (context == null) return ClientType.TV_SIMPLY;\n        if (getMode(context) == DEFAULT) return requested;
+        if (context == null) return ClientType.TV_SIMPLY;
+        if (getMode(context) == DEFAULT) return requested;
         if (requested == ClientType.ANDROID_VR_SABR) return ClientType.ANDROID_XR_SABR;
         if (requested == ClientType.ANDROID_VR_DASH) return ClientType.ANDROID_XR_DASH;
         if (requested == ClientType.ANDROID_VR_EXPERIMENTAL) return ClientType.ANDROID_XR_EXPERIMENTAL;
