@@ -84,26 +84,24 @@ Show values only when they can be measured or reliably obtained; otherwise show 
 - Never display invented file sizes, codec names, FPS, queue counts, or buffer metrics.
 - Preserve upstream notices and licensing; use distinct Ibrahim branding for derivative work.
 
-## Current status
+## Current implementation status
 
-Implementation is underway. Source now contains an independent codec policy, a separate load-control hook, and a combined in-player settings dialog. This is still not a fully verified release.
+### Implemented in source (pending CI/runtime verification)
+- Ibrahim's clean-install default codec mode is **Prefer AV1**. The preference key was versioned so an old saved "Default" selection does not silently override the new default.
+- When Morphe stream spoofing is included, Ibrahim chooses an AV1-capable request client first: TV_SIMPLY for the ordinary TV/default client, and matching AV1 variants for Android VR and visionOS selections. The originally selected client is retained as a fallback where applicable; TV SABR and Android Creator remain fallback clients.
+- The old Morphe AV1 toggle has been removed from the spoof-stream settings UI. Ibrahim now owns the AV1 client policy.
+- The old Morphe video-codec patch no longer injects VP9/AV1 codec overrides or exposes its codec selector. Its remaining patch is renamed **HDR video controls** and retains only HDR behavior.
+- Ibrahim's codec callbacks read settings through the application context even before the Ibrahim player button has been created.
+- The Ibrahim panel includes a persistent **audio-only** checkbox. When enabled, video MIME types are rejected while audio MIME types remain permitted. This is a source-level implementation and still needs playback verification.
+- Buffer defaults remain enabled at Target 3 seconds / Resume 2 seconds. The hook now uses the application context fallback and applies those defaults even before the button initializes.
+- Ibrahim's patch now depends on Morphe's spoof-video-streams patch so the AV1-capable client selection hook is included in the build.
 
-### Implemented in source
-- Added `IbrahimVideoControlButton` with its own persistent preference namespace.
-- Added a single **إبراهيم** player control and a native dialog containing codec modes, buffer enable/disable, Target and Resume sliders.
-- Added a distinct `Ibrahim: Universal video control` patch and a distinct `Ibrahim: Buffer control` patch.
-- Codec callbacks are injected at the existing VP9 capability and codec MIME decision points, but call only Ibrahim's implementation.
-- Buffer control reads the player's buffered-duration field inside the identified load-control method and applies hysteresis: stop loading at Target, resume only at Resume. It does not call or depend on `PlaybackBufferPatch`.
-- Defaults: Target 3 seconds, Resume 2 seconds.
-- Modes:
-  - Default: leave codec decisions unchanged.
-  - Prefer AV1: disables VP9 while leaving other video MIME types available. This is a limited preference and cannot guarantee AV1 wins over AVC.
-  - Force AV1 only: rejects non-AV1 video MIME types while preserving audio codec selection.
+### Not yet verified
+- The new changes have not yet been confirmed by a fresh successful CI build.
+- No runtime test has yet confirmed that TV_SIMPLY and its fallbacks produce a playable AV1 stream for the full range of videos, accounts, regions, and client choices.
+- Audio-only mode has not yet been tested against the exact YouTube player behavior.
+- Buffer behavior still requires multi-video, Shorts, live-stream, and client-switch testing; the current hysteresis state is shared and may need per-player scoping if those tests expose cross-player interference.
+- The final UI remains a native settings dialog, not the requested themed bottom sheet.
+- Live codec/profile, FPS, exact buffer-ahead, bytes, frame counters and other diagnostics are not implemented.
 
-### Not implemented / not verified
-- The dialog is currently a native choice/settings dialog, not the final themed bottom sheet requested.
-- Live selected video codec/profile, FPS, exact buffer-ahead, byte counts, frame counters, and diagnostics counters are not yet displayed.
-- No runtime patch application or playback verification against the exact YouTube 21.30.216 APK has been performed.
-- GitHub Actions is compiling/testing the source and will build the MPP only if the test job succeeds. No final MPP artifact has yet been verified.
-
-A successful source build does not prove that the bytecode hooks apply cleanly to the target APK or that playback behavior is correct. Runtime verification remains a release gate.
+A source build, even if successful, is not proof of runtime behavior on YouTube 21.30.216. Do not label this a release until the MPP applies to the exact target APK and the runtime checks above pass.
