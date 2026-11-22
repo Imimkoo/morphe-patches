@@ -61,5 +61,35 @@ val ibrahimUniversalVideoControlPatch = patch(
                 nop
             """
         )
+
+        // Use the APK-bundled dav1d JNI library rather than Android MediaCodec.
+        // This removes the hardware/system-codec gate only for AV1 streams.
+        EmbeddedDav1dFormatFingerprint.method.addInstructionsWithLabels(
+            0,
+            """
+                if-eqz p1, :ibrahim_no_dav1d
+                iget-object v0, p1, Ldefpackage/edc;->q:Ljava/lang/String;
+                const-string v1, "video/av01"
+                invoke-virtual {v1, v0}, Ljava/lang/String;->equalsIgnoreCase(Ljava/lang/String;)Z
+                move-result v0
+                if-eqz v0, :ibrahim_no_dav1d
+                invoke-static {}, Landroidx/media3/decoder/av1/Dav1dLibrary;->a()Z
+                move-result v0
+                return v0
+                :ibrahim_no_dav1d
+                const/4 v0, 0x0
+                return v0
+            """
+        )
+
+        // Always consult the embedded dav1d eligibility check, not the rollout gate.
+        EmbeddedDav1dSelectionFingerprint.method.addInstructionsWithLabels(
+            0,
+            """
+                invoke-direct {p0, p1}, Ldefpackage/sun;->bw(Ldefpackage/edc;)Z
+                move-result v0
+                return v0
+            """
+        )
     }
 }
