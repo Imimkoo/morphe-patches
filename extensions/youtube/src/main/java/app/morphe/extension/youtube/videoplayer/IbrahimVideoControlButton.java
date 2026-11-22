@@ -28,7 +28,7 @@ import app.morphe.extension.youtube.patches.VideoInformation;
 @SuppressWarnings("unused")
 public final class IbrahimVideoControlButton {
     private static final String PREFS = "ibrahim_universal_video_control";
-    private static final String MODE_KEY = "codec_mode";
+    private static final String MODE_KEY = "codec_mode_v2";
     private static final String BUFFER_ENABLED_KEY = "buffer_enabled";
     private static final String BUFFER_TARGET_KEY = "buffer_target_seconds";
     private static final String BUFFER_RESUME_KEY = "buffer_resume_seconds";
@@ -112,7 +112,7 @@ public final class IbrahimVideoControlButton {
             codecGroup.setOrientation(RadioGroup.VERTICAL);
             String[] labels = {
                     "Default — اختيار YouTube الأصلي",
-                    "Prefer AV1 — تعطيل VP9 مع السماح بباقي الترميزات",
+                    "Prefer AV1 — اختيار AV1 أولًا مع السماح بالبدائل المتوافقة",
                     "Force AV1 only — منع كل ترميز فيديو غير AV1"
             };
             int selectedMode = getMode(context);
