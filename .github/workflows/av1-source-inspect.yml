@@ -6,6 +6,9 @@ on:
       - "ibrahim/universal-video-control"
     paths:
       - ".github/workflows/av1-source-inspect.yml"
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
