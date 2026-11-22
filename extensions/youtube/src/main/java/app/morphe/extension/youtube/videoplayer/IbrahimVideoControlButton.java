@@ -8,7 +8,6 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
 import android.content.Context;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
@@ -22,6 +21,8 @@ import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
+
+import java.util.Locale;
 
 import androidx.annotation.Nullable;
 
