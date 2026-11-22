@@ -33,6 +33,9 @@ public class SpoofVideoStreamsPatch {
         ClientType preferredClient = IbrahimVideoControlButton.getPreferredAv1Client(requestedClient);
 
         List<ClientType> availableClients = new ArrayList<>(List.of(
+                // Keep a JavaScript-independent AV1 candidate available even when the
+                // selected Android XR profile requires OAuth and cannot be used.
+                ClientType.VISIONOS_1_06_AV1,
                 ClientType.TV_SABR,
                 ClientType.ANDROID_CREATOR
         ));
