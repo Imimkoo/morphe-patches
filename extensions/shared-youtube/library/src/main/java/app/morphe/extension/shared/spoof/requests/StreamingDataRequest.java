@@ -771,7 +771,7 @@ public class StreamingDataRequest {
                 Logger.printDebug(() -> "Spoof format [" + clientType + "]: mime="
                         + mimeType + ", itag=" + itag);
                 if (formatCount++ < 40) {
-                    if (formatSummary.length() > 0) formatSummary.append('\\n');
+                    if (formatSummary.length() > 0) formatSummary.append('\n');
                     formatSummary.append("mime=").append(mimeType).append(", itag=").append(itag);
                 }
             }
