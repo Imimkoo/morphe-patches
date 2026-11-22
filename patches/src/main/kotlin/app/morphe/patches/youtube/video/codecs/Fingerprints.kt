@@ -51,3 +51,27 @@ internal object CodecSupportCheckFingerprint : Fingerprint(
         "I"
     )
 )
+
+
+/**
+ * YouTube's embedded dav1d eligibility check. The original method gates AV1
+ * behind device/remote capability checks even though the APK bundles dav1dJNI.
+ */
+internal object EmbeddedDav1dFormatFingerprint : Fingerprint(
+    definingClass = "Ldefpackage/sun;",
+    name = "bw",
+    returnType = "Z",
+    parameters = listOf("Ldefpackage/edc;"),
+    strings = listOf("video/av01")
+)
+
+/**
+ * Renderer-selection gate. Keep the existing AV1-vs-other-format decision,
+ * but do not let the rollout/device gate suppress the APK-bundled decoder.
+ */
+internal object EmbeddedDav1dSelectionFingerprint : Fingerprint(
+    definingClass = "Ldefpackage/sun;",
+    name = "aN",
+    returnType = "Z",
+    parameters = listOf("Ldefpackage/edc;")
+)
