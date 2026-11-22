@@ -62,7 +62,14 @@ public final class IbrahimVideoControlButton {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(MODE_KEY, PREFER_AV1);
     }
 
-    private static Context getContext() {\n        Context context = appContext;\n        return context != null ? context : Utils.getContext();\n    }\n\n    private static boolean isAudioOnly(Context context) {\n        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(AUDIO_ONLY_KEY, false);\n    }\n\n    public static ClientType getPreferredAv1Client(ClientType requested) {\n        Context context = getContext();\n        if (context == null || getMode(context) == DEFAULT) return requested;\n        if (requested == ClientType.ANDROID_VR_SABR) return ClientType.ANDROID_XR_SABR;\n        if (requested == ClientType.ANDROID_VR_DASH) return ClientType.ANDROID_XR_DASH;\n        if (requested == ClientType.ANDROID_VR_EXPERIMENTAL) return ClientType.ANDROID_XR_EXPERIMENTAL;\n        if (requested == ClientType.VISIONOS_1_02) return ClientType.VISIONOS_1_03;\n        if (requested == ClientType.VISIONOS_1_06) return ClientType.VISIONOS_1_06_AV1;\n        return ClientType.TV_SIMPLY;\n    }\n\n    private static boolean isBufferEnabled(Context context) {
+    private static Context getContext() {
+        Context context = appContext;\n        return context != null ? context : Utils.getContext();\n    }
+
+    private static boolean isAudioOnly(Context context) {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(AUDIO_ONLY_KEY, false);\n    }
+
+    public static ClientType getPreferredAv1Client(ClientType requested) {
+        Context context = getContext();\n        if (context == null || getMode(context) == DEFAULT) return requested;\n        if (requested == ClientType.ANDROID_VR_SABR) return ClientType.ANDROID_XR_SABR;\n        if (requested == ClientType.ANDROID_VR_DASH) return ClientType.ANDROID_XR_DASH;\n        if (requested == ClientType.ANDROID_VR_EXPERIMENTAL) return ClientType.ANDROID_XR_EXPERIMENTAL;\n        if (requested == ClientType.VISIONOS_1_02) return ClientType.VISIONOS_1_03;\n        if (requested == ClientType.VISIONOS_1_06) return ClientType.VISIONOS_1_06_AV1;\n        return ClientType.TV_SIMPLY;\n    }\n\n    private static boolean isBufferEnabled(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .getBoolean(BUFFER_ENABLED_KEY, true);
     }
@@ -110,7 +117,12 @@ public final class IbrahimVideoControlButton {
             bufferTitle.setText("\nالتحكم في التحميل المسبق");
             content.addView(bufferTitle);
 
-            CheckBox audioOnly = new CheckBox(context);\n            audioOnly.setText("تشغيل الفيديوهات كصوت فقط");\n            audioOnly.setChecked(isAudioOnly(context));\n            content.addView(audioOnly);\n\n            CheckBox bufferEnabled = new CheckBox(context);
+            CheckBox audioOnly = new CheckBox(context);
+            audioOnly.setText("تشغيل الفيديوهات كصوت فقط");
+            audioOnly.setChecked(isAudioOnly(context));
+            content.addView(audioOnly);
+
+            CheckBox bufferEnabled = new CheckBox(context);
             bufferEnabled.setText("تفعيل حد التخزين المؤقت");
             bufferEnabled.setChecked(isBufferEnabled(context));
             content.addView(bufferEnabled);
@@ -174,7 +186,8 @@ public final class IbrahimVideoControlButton {
                         int resume = Math.min(resumeBar.getProgress(), target - 1);
                         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                                 .putInt(MODE_KEY, mode)
-                                .putBoolean(AUDIO_ONLY_KEY, audioOnly.isChecked())\n                                .putBoolean(BUFFER_ENABLED_KEY, bufferEnabled.isChecked())
+                                .putBoolean(AUDIO_ONLY_KEY, audioOnly.isChecked())
+                                .putBoolean(BUFFER_ENABLED_KEY, bufferEnabled.isChecked())
                                 .putInt(BUFFER_TARGET_KEY, target)
                                 .putInt(BUFFER_RESUME_KEY, resume)
                                 .apply();
