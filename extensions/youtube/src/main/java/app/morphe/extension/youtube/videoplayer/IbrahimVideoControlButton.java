@@ -6,6 +6,9 @@ package app.morphe.extension.youtube.videoplayer;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
+import android.os.Build;
 import android.view.View;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
@@ -211,6 +214,30 @@ public final class IbrahimVideoControlButton {
                     .show();
         } catch (Exception ex) {
             Logger.printException(() -> "Ibrahim panel failed", ex);
+        }
+    }
+
+
+    /** Reports the AV1 decoders actually exposed by Android on this device. */
+    private static String av1DecoderSummary() {
+        try {
+            StringBuilder result = new StringBuilder("AV1 decoder(s): ");
+            int count = 0;
+            for (MediaCodecInfo codec : new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos()) {
+                if (codec.isEncoder()) continue;
+                for (String type : codec.getSupportedTypes()) {
+                    if ("video/av01".equalsIgnoreCase(type)) {
+                        if (count++ > 0) result.append(", ");
+                        result.append(codec.getName());
+                        if (Build.VERSION.SDK_INT >= 29) {
+                            result.append(codec.isHardwareAccelerated() ? " [HW]" : " [SW]");
+                        }
+                    }
+                }
+            }
+            return count == 0 ? "AV1 decoder(s): لا يوجد مفكك AV1 ظاهر عبر MediaCodec" : result.toString();
+        } catch (Exception ex) {
+            return "AV1 decoder(s): تعذر فحص MediaCodec (" + ex.getClass().getSimpleName() + ")";
         }
     }
 
