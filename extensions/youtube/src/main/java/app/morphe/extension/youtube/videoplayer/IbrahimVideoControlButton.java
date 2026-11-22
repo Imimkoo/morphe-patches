@@ -200,6 +200,11 @@ public final class IbrahimVideoControlButton {
                     + "\nالتغييرات تطبق أثناء قرارات التحميل؛ سياسة الترميز قد تتطلب إعادة تحميل الفيديو.");
             content.addView(liveInfo);
 
+            Button decoderProbeButton = new Button(context);
+            decoderProbeButton.setText("اختبار مفككات AV1");
+            decoderProbeButton.setOnClickListener(view -> IbrahimAv1DecoderProbe.run(context));
+            content.addView(decoderProbeButton);
+
             Button diagnosticButton = new Button(context);
             diagnosticButton.setText("جمع تقرير تشخيص الفيديو");
             diagnosticButton.setOnClickListener(view -> runDiagnostic(context));
