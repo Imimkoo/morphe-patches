@@ -19,11 +19,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - name: Checkout current patch source
+        uses: actions/checkout@v7
+
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
+
+      - name: Build current Morphe patch bundle
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ./gradlew :patches:buildAndroid -PpatchesName="Morphe Test Build" --no-daemon
+          MPP="$(find patches/build/libs -type f -name '*.mpp' -print -quit)"
+          test -n "$MPP" && test -s "$MPP"
+          echo "Built MPP: $MPP"
+          ls -lh "$MPP"
 
       - name: Download verified YouTube stock APK
         uses: actions/download-artifact@v4
@@ -33,16 +48,6 @@ jobs:
           run-id: 45085016704
           github-token: ${{ github.token }}
           path: source
-
-      - name: Download Morphe patch bundle
-        uses: actions/download-artifact@v8
-        with:
-          name: patches-2.4.0-dev.6.mpp
-          repository: ${{ github.repository }}
-          run-id: 45086485586
-          github-token: ${{ github.token }}
-          path: patches
-          skip-decompress: true
 
       - name: Build compatible Morphe CLI and download apksigner
         shell: bash
@@ -78,7 +83,7 @@ jobs:
           echo "Downloaded patch input:"
           find patches -maxdepth 3 -type f -printf '%p (%s bytes)\\n' | sort
 
-          MPP="$(find patches -type f -name '*.mpp' -print -quit)"
+          MPP="$(find patches/build/libs -type f -name '*.mpp' -print -quit)"
           if [ ! -s "$STOCK" ]; then
             echo "::error::Stock APK is missing or empty at $STOCK"
             find source -maxdepth 4 -print | sort
@@ -92,11 +97,10 @@ jobs:
 
           echo "3775a15129dcc4e5b80fc17b7e0841b7fdd1ca89a6e72baa798806f666c74d02  $STOCK" \
             | sha256sum -c -
-          echo "0ea3ef2fa94ffae608baebf28b7f62eee16506b27dce1ef0fb0c05673e936e33  $MPP" \
-            | sha256sum -c -
           unzip -t "$MPP" >/dev/null
+          unzip -p "$MPP" META-INF/MANIFEST.MF | grep -F "Patcher-Version: 2.4.0"
           sha256sum "$MPP" | tee build/mpp-sha256.txt
-          echo "Both input artifacts are present, checksum-verified, and structurally valid."
+          echo "Stock APK checksum verified; MPP was built from this workflow's checked-out source and passed archive/manifest checks."
 
       - name: Patch YouTube using the embedded dav1d path
         shell: bash
