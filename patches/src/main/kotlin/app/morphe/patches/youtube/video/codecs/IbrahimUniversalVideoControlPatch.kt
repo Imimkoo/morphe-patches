@@ -86,7 +86,7 @@ val ibrahimUniversalVideoControlPatch = patch(
         EmbeddedDav1dSelectionFingerprint.method.addInstructionsWithLabels(
             0,
             """
-                invoke-virtual {p0, p1}, Lsun;->bw(Ledc;)Z
+                invoke-direct {p0, p1}, Lsun;->bw(Ledc;)Z
                 move-result v0
                 return v0
             """
