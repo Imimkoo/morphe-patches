@@ -90,7 +90,7 @@ jobs:
             exit 1
           fi
           if [ -z "$MPP" ] || [ ! -s "$MPP" ]; then
-            echo "::error::Raw MPP file is missing after artifact download"
+            echo "::error::Fresh MPP file is missing after the source build"
             find patches -maxdepth 4 -print | sort
             exit 1
           fi
@@ -107,7 +107,7 @@ jobs:
         run: |
           set -euo pipefail
           STOCK="source/youtube-stock.apk"
-          MPP="$(find patches -type f -name '*.mpp' -print -quit)"
+          MPP="$(find patches/build/libs -type f -name '*.mpp' -print -quit)"
           java -jar tools/morphe-desktop.jar patch "$STOCK" \
             -o build/youtube-unsigned.apk \
             --unsigned \
