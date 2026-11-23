@@ -1,3 +1,0 @@
-Trigger the final ARM64 APK verification workflow.
-
-Trigger PR synchronize for final APK build.
