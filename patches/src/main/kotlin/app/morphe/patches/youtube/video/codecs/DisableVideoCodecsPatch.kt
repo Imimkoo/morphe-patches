@@ -10,16 +10,11 @@
 
 package app.morphe.patches.youtube.video.codecs
 
-import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.patch
 import app.morphe.patcher.util.matchAllMethodIndicesForEach
-import app.morphe.patches.shared.misc.settings.preference.ListPreference
-import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
-import app.morphe.patches.shared.misc.settings.preference.noTitleUnsortedPreferenceCategory
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
-import app.morphe.patches.youtube.misc.settings.PreferenceScreen
 import app.morphe.patches.youtube.misc.settings.settingsPatch
 import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
@@ -28,8 +23,8 @@ private const val EXTENSION_CLASS =
     "Lapp/morphe/extension/youtube/patches/DisableVideoCodecsPatch;"
 
 val disableVideoCodecsPatch = patch(
-    name = "Disable video codecs",
-    description = "Adds options to disable or force HDR, and to disable VP9 or AV1 codecs.",
+    name = "HDR video controls",
+    description = "Adds options to disable or force HDR. Codec selection is handled by Ibrahim Universal Video Control.",
 ) {
     dependsOn(
         sharedExtensionPatch,
@@ -39,41 +34,6 @@ val disableVideoCodecsPatch = patch(
     compatibleWith(COMPATIBILITY_YOUTUBE)
 
     execute {
-        PreferenceScreen.VIDEO.addPreferences(
-            noTitleUnsortedPreferenceCategory(
-                SwitchPreference("morphe_disable_hdr_video"),
-                SwitchPreference("morphe_force_hdr_video", summary = true),
-            ),
-            ListPreference(
-                key = "morphe_video_codec",
-                tag = "app.morphe.extension.youtube.settings.preference.VideoCodecListPreference"
-            )
-        )
-
-        Vp9CapabilityFingerprint.method.addInstructionsWithLabels(
-            0,
-            """
-                invoke-static {}, $EXTENSION_CLASS->allowVP9()Z
-                move-result v0
-                if-nez v0, :default
-                return v0
-                :default
-                nop
-            """
-        )
-
-        CodecSupportCheckFingerprint.method.addInstructionsWithLabels(
-            0,
-            """
-                invoke-static { p2 }, $EXTENSION_CLASS->allowCodec(Ljava/lang/String;)Z
-                move-result v0
-                if-nez v0, :default
-                return v0
-                :default
-                nop
-            """
-        )
-
         HDRCapabilityFingerprint.matchAllMethodIndicesForEach { index ->
             val instruction = getInstruction<FiveRegisterInstruction>(index)
             val register = instruction.registerC

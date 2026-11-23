@@ -205,6 +205,13 @@ public class StreamingDataRequest {
      */
     private static volatile ClientType lastSpoofedClientType;
 
+    /** Last adaptive formats returned by the spoof response; offered formats, not selected track. */
+    private static volatile String lastStreamFormatsSummary = "No spoof stream response captured yet.";
+
+    public static String getLastStreamFormatsSummary() {
+        return lastStreamFormatsSummary;
+    }
+
     /**
      * Clients of the streams given to the player, by video id.
      * The streams of another video can be given before the player is set up for a video,
@@ -753,6 +760,23 @@ public class StreamingDataRequest {
                 handleDebugToast("Debug: Ignoring empty adaptiveFormat (%s)", clientType);
                 return null;
             }
+
+            // Diagnostic: distinguish a server response without AV1 from a player/decoder
+            // that receives AV1 but chooses another format.
+            StringBuilder formatSummary = new StringBuilder();
+            int formatCount = 0;
+            for (Format format : streamingData.getAdaptiveFormatsList()) {
+                final String mimeType = format.getMimeType();
+                final int itag = format.getItag();
+                Logger.printDebug(() -> "Spoof format [" + clientType + "]: mime="
+                        + mimeType + ", itag=" + itag);
+                if (formatCount++ < 40) {
+                    if (formatSummary.length() > 0) formatSummary.append('\n');
+                    formatSummary.append("mime=").append(mimeType).append(", itag=").append(itag);
+                }
+            }
+            lastStreamFormatsSummary = "client=" + clientType + ", adaptiveFormats="
+                    + streamingData.getAdaptiveFormatsCount() + "\\n" + formatSummary;
 
             // In YouTube 20.21.37, manifestless live streams cannot be played using the SABR protocol, or there are playback issues.
             // Until code to assemble the manifestUrl is implemented or code to override the exoPlayerConfig is ready,
