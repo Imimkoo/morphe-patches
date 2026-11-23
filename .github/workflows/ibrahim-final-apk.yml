@@ -68,18 +68,35 @@ jobs:
           echo "eefdd6aed9db9fb849e4c98a50d8741e19d1b674ba6547220bcb9c3ed152123a  tools/apksigner.jar" \
             | sha256sum -c -
 
-      - name: Verify inputs and patch availability
+      - name: Verify downloaded inputs and MPP integrity
         shell: bash
         run: |
           set -euo pipefail
           STOCK="source/youtube-stock.apk"
+          echo "Downloaded stock input:"
+          find source -maxdepth 3 -type f -printf '%p (%s bytes)\\n' | sort
+          echo "Downloaded patch input:"
+          find patches -maxdepth 3 -type f -printf '%p (%s bytes)\\n' | sort
+
           MPP="$(find patches -type f -name '*.mpp' -print -quit)"
-          test -s "$STOCK"
-          test -n "$MPP"
+          if [ ! -s "$STOCK" ]; then
+            echo "::error::Stock APK is missing or empty at $STOCK"
+            find source -maxdepth 4 -print | sort
+            exit 1
+          fi
+          if [ -z "$MPP" ] || [ ! -s "$MPP" ]; then
+            echo "::error::Raw MPP file is missing after artifact download"
+            find patches -maxdepth 4 -print | sort
+            exit 1
+          fi
+
           echo "3775a15129dcc4e5b80fc17b7e0841b7fdd1ca89a6e72baa798806f666c74d02  $STOCK" \
             | sha256sum -c -
+          echo "0ea3ef2fa94ffae608baebf28b7f62eee16506b27dce1ef0fb0c05673e936e33  $MPP" \
+            | sha256sum -c -
+          unzip -t "$MPP" >/dev/null
           sha256sum "$MPP" | tee build/mpp-sha256.txt
-          echo "Input files and stock APK checksum verified. Skipping optional CLI patch listing; the patch command and patch-result.json are the authoritative validation."
+          echo "Both input artifacts are present, checksum-verified, and structurally valid."
 
       - name: Patch YouTube using the embedded dav1d path
         shell: bash
@@ -178,6 +195,5 @@ jobs:
             build/verification.txt
             build/final-sha256.txt
             build/patch-result.json
-            build/available-patches.txt
           if-no-files-found: error
           retention-days: 30
