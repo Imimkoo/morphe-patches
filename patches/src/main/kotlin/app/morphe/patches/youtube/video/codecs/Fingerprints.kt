@@ -58,10 +58,10 @@ internal object CodecSupportCheckFingerprint : Fingerprint(
  * behind device/remote capability checks even though the APK bundles dav1dJNI.
  */
 internal object EmbeddedDav1dFormatFingerprint : Fingerprint(
-    definingClass = "Ldefpackage/sun;",
+    definingClass = "Lsun;",
     name = "bw",
     returnType = "Z",
-    parameters = listOf("Ldefpackage/edc;"),
+    parameters = listOf("Ledc;"),
     strings = listOf("video/av01")
 )
 
@@ -79,8 +79,8 @@ internal object EmbeddedDav1dSelectionFingerprint : Fingerprint(
 
 /** Tracks the renderer selected by YouTube's AV1/MediaCodec splice renderer. */
 internal object EmbeddedDav1dRendererStateFingerprint : Fingerprint(
-    definingClass = "Ldefpackage/suq;",
+    definingClass = "Lsuq;",
     name = "aE",
     returnType = "V",
-    parameters = listOf("Ldefpackage/aovd;")
+    parameters = listOf("Laovd;")
 )
