@@ -91,5 +91,22 @@ val ibrahimUniversalVideoControlPatch = patch(
                 return v0
             """
         )
+
+        // Publish the renderer state after YouTube switches the splice renderer.
+        EmbeddedDav1dRendererStateFingerprint.method.addInstructionsWithLabels(
+            0,
+            """
+                sget-object v0, Ldefpackage/aovd;->g:Ldefpackage/aovd;
+                if-ne p1, v0, :ibrahim_media_codec
+                const-string v0, "DAV1D"
+                invoke-static {v0}, $IBRAHIM_CLASS->setRendererState(Ljava/lang/String;)V
+                goto :ibrahim_renderer_state_done
+                :ibrahim_media_codec
+                const-string v0, "MEDIA_CODEC"
+                invoke-static {v0}, $IBRAHIM_CLASS->setRendererState(Ljava/lang/String;)V
+                :ibrahim_renderer_state_done
+                nop
+            """
+        )
     }
 }
