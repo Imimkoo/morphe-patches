@@ -75,3 +75,12 @@ internal object EmbeddedDav1dSelectionFingerprint : Fingerprint(
     returnType = "Z",
     parameters = listOf("Ldefpackage/edc;")
 )
+
+
+/** Tracks the renderer selected by YouTube's AV1/MediaCodec splice renderer. */
+internal object EmbeddedDav1dRendererStateFingerprint : Fingerprint(
+    definingClass = "Ldefpackage/suq;",
+    name = "aE",
+    returnType = "V",
+    parameters = listOf("Ldefpackage/aovd;")
+)
