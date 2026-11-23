@@ -8,6 +8,9 @@ on:
   pull_request:
     branches:
       - "dev"
+  issue_comment:
+    types:
+      - created
 
 permissions:
   contents: read
@@ -15,6 +18,7 @@ permissions:
 
 jobs:
   build-final-apk:
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '/run-final-av1-apk'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
