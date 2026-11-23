@@ -1,0 +1,183 @@
+name: Ibrahim final YouTube APK with embedded dav1d
+# Retry build after fixing CLI setup output directory (verified retry)
+
+on:
+  push:
+    branches:
+      - "ibrahim/universal-video-control"
+  pull_request:
+    branches:
+      - "dev"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build-final-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Download verified YouTube stock APK
+        uses: actions/download-artifact@v4
+        with:
+          name: youtube-21.30.216-stock-av1-inspection
+          repository: ${{ github.repository }}
+          run-id: 45085016704
+          github-token: ${{ github.token }}
+          path: source
+
+      - name: Download Morphe patch bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: patches-2.4.0-dev.6.mpp
+          repository: ${{ github.repository }}
+          run-id: 45086485586
+          github-token: ${{ github.token }}
+          path: patches
+
+      - name: Build compatible Morphe CLI and download apksigner
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p tools/morphe build
+          git clone --depth 1 https://github.com/MorpheApp/morphe-desktop.git tools/morphe/morphe-desktop
+          git clone --depth 1 --branch v2.5.0 https://github.com/MorpheApp/morphe-patcher.git tools/morphe/morphe-patcher
+          git clone --depth 1 --branch v1.4.0 https://github.com/MorpheApp/morphe-library.git tools/morphe/morphe-library
+          (
+            cd tools/morphe/morphe-desktop
+            ./gradlew build --no-daemon
+            cp "$(find build/libs -type f -name 'morphe-desktop-*-all.jar' -print -quit)" ../../../tools/morphe-desktop.jar
+          )
+          test -s tools/morphe-desktop.jar
+          java -jar tools/morphe-desktop.jar --help | tee build/morphe-cli-help.txt
+
+          curl --fail --location --retry 2 --connect-timeout 20 --max-time 300 \
+            https://raw.githubusercontent.com/asp345/morphe-builds/main/bin/apksigner.jar \
+            -o tools/apksigner.jar
+          echo "eefdd6aed9db9fb849e4c98a50d8741e19d1b674ba6547220bcb9c3ed152123a  tools/apksigner.jar" \
+            | sha256sum -c -
+
+      - name: Verify inputs and patch availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          STOCK="source/youtube-stock.apk"
+          MPP="$(find patches -type f -name '*.mpp' -print -quit)"
+          test -s "$STOCK"
+          test -n "$MPP"
+          echo "3775a15129dcc4e5b80fc17b7e0841b7fdd1ca89a6e72baa798806f666c74d02  $STOCK" \
+            | sha256sum -c -
+          sha256sum "$MPP" | tee build/mpp-sha256.txt
+          java -jar tools/morphe-desktop.jar list-patches --patches="$MPP" -f com.google.android.youtube \
+            | tee build/available-patches.txt
+          grep -F "Ibrahim: Universal video control" build/available-patches.txt
+
+      - name: Patch YouTube using the embedded dav1d path
+        shell: bash
+        run: |
+          set -euo pipefail
+          STOCK="source/youtube-stock.apk"
+          MPP="$(find patches -type f -name '*.mpp' -print -quit)"
+          java -jar tools/morphe-desktop.jar patch "$STOCK" \
+            -o build/youtube-unsigned.apk \
+            --unsigned \
+            --striplibs arm64-v8a \
+            -p "$MPP" \
+            -e "Ibrahim: Universal video control" \
+            -d "Custom branding" \
+            -d "Change header" \
+            -d "Return YouTube Dislike" \
+            -r build/patch-result.json \
+            -t build/patch-tmp
+          test -s build/youtube-unsigned.apk
+          jq -e '.success == true and (.failedPatches | length) == 0' build/patch-result.json
+          cat build/patch-result.json
+
+      - name: Verify embedded decoder and patched renderer bytecode
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="build/youtube-unsigned.apk"
+          unzip -t "$APK" >/dev/null
+          for LIB in libdav1dJNI.so libvpxV2JNI.so libvpx.so; do
+            unzip -l "$APK" | grep -F "lib/arm64-v8a/$LIB"
+          done
+          unzip -p source/youtube-stock.apk lib/arm64-v8a/libdav1dJNI.so > build/stock-dav1d.so
+          unzip -p "$APK" lib/arm64-v8a/libdav1dJNI.so > build/patched-dav1d.so
+          cmp build/stock-dav1d.so build/patched-dav1d.so
+          sha256sum build/patched-dav1d.so | tee build/dav1d-native-sha256.txt
+
+          : > build/dex-strings.txt
+          while IFS= read -r DEX; do
+            unzip -p "$APK" "$DEX" | strings >> build/dex-strings.txt
+          done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*\.dex$')
+          grep -q "Dav1dDecoderHelper" build/dex-strings.txt
+          grep -q "CODEC_SPLICE_DAV1D" build/dex-strings.txt
+          grep -q "IBRAHIM EMBEDDED DAV1D TEST v2" build/dex-strings.txt
+
+          curl --fail --location --retry 2 --connect-timeout 20 --max-time 300 \
+            https://github.com/skylot/jadx/releases/download/v1.5.7/jadx-1.5.7.zip -o tools/jadx.zip
+          unzip -q tools/jadx.zip -d tools/jadx
+          chmod +x tools/jadx/bin/jadx
+          tools/jadx/bin/jadx --no-res --threads-count 4 --single-class defpackage.sun \
+            --single-class-output build/sun.java "$APK" > build/jadx-sun.log 2>&1 || true
+          tools/jadx/bin/jadx --no-res --threads-count 4 --single-class defpackage.suq \
+            --single-class-output build/suq.java "$APK" > build/jadx-suq.log 2>&1 || true
+          grep -q "Dav1dLibrary.a" build/sun.java
+          grep -q "setRendererState" build/suq.java
+          grep -q "equalsIgnoreCase" build/sun.java
+
+      - name: Sign and verify final ARM64 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -noprompt \
+            -alias release -keyalg RSA -keysize 2048 -validity 10000 \
+            -keystore build/ibrahim-debug.keystore \
+            -storepass android -keypass android \
+            -dname "CN=Ibrahim Morphe Build,O=Morphe,C=EG"
+          java -jar tools/apksigner.jar sign \
+            --ks build/ibrahim-debug.keystore \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --ks-key-alias release \
+            --v4-signing-enabled false \
+            --out build/youtube-21.30.216-dav1d-arm64.apk \
+            build/youtube-unsigned.apk
+          java -jar tools/apksigner.jar verify --print-certs \
+            build/youtube-21.30.216-dav1d-arm64.apk | tee build/signature.txt
+          unzip -t build/youtube-21.30.216-dav1d-arm64.apk >/dev/null
+          sha256sum build/youtube-21.30.216-dav1d-arm64.apk | tee build/final-sha256.txt
+          {
+            echo "App: YouTube 21.30.216"
+            echo "Architecture: arm64-v8a"
+            echo "AV1 decoder: APK-bundled dav1dJNI"
+            echo "VP9 fallback libraries: APK-bundled libvpxV2JNI/libvpx"
+            echo "Android MediaCodec AV1 dependency: none in the forced AV1 path"
+            echo "Stock APK SHA256: 3775a15129dcc4e5b80fc17b7e0841b7fdd1ca89a6e72baa798806f666c74d02"
+            cat build/dav1d-native-sha256.txt
+            cat build/final-sha256.txt
+            cat build/signature.txt
+          } > build/verification.txt
+
+      - name: Upload final APK and verification report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ibrahim-youtube-21.30.216-dav1d-arm64
+          path: |
+            build/youtube-21.30.216-dav1d-arm64.apk
+            build/verification.txt
+            build/final-sha256.txt
+            build/patch-result.json
+            build/available-patches.txt
+          if-no-files-found: error
+          retention-days: 30
