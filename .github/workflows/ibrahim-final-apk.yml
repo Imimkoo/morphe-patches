@@ -46,12 +46,12 @@ jobs:
           curl --fail --location --retry 2 --connect-timeout 20 --max-time 300 \
             https://github.com/MorpheApp/morphe-desktop/releases/download/v2.3.0/morphe-desktop-2.3.0-all.jar \
             -o tools/morphe-desktop.jar
-          echo "f05c0dbcb9a76c26b1306f9e2f24a6eae3ecb2f1d0b3a8a3a6e8c2c8f9f2b0a1  tools/morphe-desktop.jar" \
+          echo "e0e49525e1fbe1108d6cfd7398d39e0cd489c58a753e63653c1e8f11a0099757  tools/morphe-desktop.jar" \
             | sha256sum -c -
           curl --fail --location --retry 2 --connect-timeout 20 --max-time 300 \
             https://raw.githubusercontent.com/asp345/morphe-builds/main/bin/apksigner.jar \
             -o tools/apksigner.jar
-          echo "eefdd6a42e3e7c3e8e0e7b13a13bce5d  tools/apksigner.jar" \
+          echo "eefdd6aed9db9fb849e4c98a50d8741e19d1b674ba6547220bcb9c3ed152123a  tools/apksigner.jar" \
             | sha256sum -c -
 
       - name: Verify inputs and patch availability
