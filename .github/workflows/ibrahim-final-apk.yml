@@ -44,7 +44,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p tools/morphe
+          mkdir -p tools/morphe build
           git clone --depth 1 https://github.com/MorpheApp/morphe-desktop.git tools/morphe/morphe-desktop
           git clone --depth 1 --branch v2.5.0 https://github.com/MorpheApp/morphe-patcher.git tools/morphe/morphe-patcher
           git clone --depth 1 --branch v1.4.0 https://github.com/MorpheApp/morphe-library.git tools/morphe/morphe-library
