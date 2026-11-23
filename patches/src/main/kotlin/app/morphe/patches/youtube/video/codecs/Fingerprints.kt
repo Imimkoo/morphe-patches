@@ -70,10 +70,10 @@ internal object EmbeddedDav1dFormatFingerprint : Fingerprint(
  * but do not let the rollout/device gate suppress the APK-bundled decoder.
  */
 internal object EmbeddedDav1dSelectionFingerprint : Fingerprint(
-    definingClass = "Ldefpackage/sun;",
+    definingClass = "Lsun;",
     name = "aN",
     returnType = "Z",
-    parameters = listOf("Ldefpackage/edc;")
+    parameters = listOf("Ledc;")
 )
 
 
