@@ -52,6 +52,7 @@ public final class IbrahimVideoControlButton {
 
     private static volatile Context appContext;
     private static volatile boolean bufferThrottled;
+    private static volatile String lastRendererState = "UNKNOWN";
 
     private IbrahimVideoControlButton() {}
 
@@ -375,7 +376,8 @@ public final class IbrahimVideoControlButton {
             Class.forName("androidx.media3.decoder.av1.Libdav1dVideoRenderer");
             return "مفكك dav1d المدمج داخل التطبيق: "
                     + (loaded ? "متاح ومحمّل" : "غير متاح")
-                    + " | Decoder وRenderer موجودان داخل APK";
+                    + " | Decoder وRenderer موجودان داخل APK"
+                    + " | renderer=" + lastRendererState;
         } catch (Throwable ex) {
             return "فحص مفكك dav1d المدمج فشل: " + ex.getClass().getSimpleName()
                     + ": " + String.valueOf(ex.getMessage());
@@ -391,6 +393,11 @@ public final class IbrahimVideoControlButton {
         } catch (Exception ignored) {
             return "معلومات الجودة الحالية: غير متاحة";
         }
+    }
+
+    /** Called by YouTube's renderer splice when its active renderer changes. */
+    public static void setRendererState(String state) {
+        if (state != null) lastRendererState = state;
     }
 
     /** Hook: controls whether YouTube may use VP9. */
