@@ -35,13 +35,14 @@ jobs:
           path: source
 
       - name: Download Morphe patch bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: patches-2.4.0-dev.6.mpp
           repository: ${{ github.repository }}
           run-id: 45086485586
           github-token: ${{ github.token }}
           path: patches
+          skip-decompress: true
 
       - name: Build compatible Morphe CLI and download apksigner
         shell: bash
