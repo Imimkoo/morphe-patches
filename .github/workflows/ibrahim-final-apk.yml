@@ -38,16 +38,24 @@ jobs:
           github-token: ${{ github.token }}
           path: patches
 
-      - name: Download Morphe CLI and apksigner
+      - name: Build compatible Morphe CLI and download apksigner
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p tools build
-          curl --fail --location --retry 2 --connect-timeout 20 --max-time 300 \
-            https://github.com/MorpheApp/morphe-desktop/releases/download/v2.3.0/morphe-desktop-2.3.0-all.jar \
-            -o tools/morphe-desktop.jar
-          echo "e0e49525e1fbe1108d6cfd7398d39e0cd489c58a753e63653c1e8f11a0099757  tools/morphe-desktop.jar" \
-            | sha256sum -c -
+          mkdir -p tools/morphe
+          git clone --depth 1 https://github.com/MorpheApp/morphe-desktop.git tools/morphe/morphe-desktop
+          git clone --depth 1 --branch v2.5.0 https://github.com/MorpheApp/morphe-patcher.git tools/morphe/morphe-patcher
+          git clone --depth 1 --branch v1.4.0 https://github.com/MorpheApp/morphe-library.git tools/morphe/morphe-library
+          (
+            cd tools/morphe/morphe-desktop
+            ./gradlew build --no-daemon
+            cp "$(find build/libs -type f -name 'morphe-desktop-*-all.jar' -print -quit)" ../../../tools/morphe-desktop.jar
+          )
+          test -s tools/morphe-desktop.jar
+          java -jar tools/morphe-desktop.jar --help | tee build/morphe-cli-help.txt
+
           curl --fail --location --retry 2 --connect-timeout 20 --max-time 300 \
             https://raw.githubusercontent.com/asp345/morphe-builds/main/bin/apksigner.jar \
             -o tools/apksigner.jar
