@@ -78,9 +78,7 @@ jobs:
           echo "3775a15129dcc4e5b80fc17b7e0841b7fdd1ca89a6e72baa798806f666c74d02  $STOCK" \
             | sha256sum -c -
           sha256sum "$MPP" | tee build/mpp-sha256.txt
-          java -jar tools/morphe-desktop.jar list-patches --patches="$MPP" \
-            | tee build/available-patches.txt
-          echo "Patch listing captured; the patch command and patch-result.json are the authoritative validation."
+          echo "Input files and stock APK checksum verified. Skipping optional CLI patch listing; the patch command and patch-result.json are the authoritative validation."
 
       - name: Patch YouTube using the embedded dav1d path
         shell: bash
