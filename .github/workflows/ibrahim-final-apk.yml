@@ -58,7 +58,7 @@ jobs:
             cp "$(find build/libs -type f -name 'morphe-desktop-*-all.jar' -print -quit)" ../../../tools/morphe-desktop.jar
           )
           test -s tools/morphe-desktop.jar
-          java -jar tools/morphe-desktop.jar --help | tee build/morphe-cli-help.txt
+          java -jar tools/morphe-desktop.jar --help > build/morphe-cli-help.txt 2>&1 || true
 
           curl --fail --location --retry 2 --connect-timeout 20 --max-time 300 \
             https://raw.githubusercontent.com/asp345/morphe-builds/main/bin/apksigner.jar \
