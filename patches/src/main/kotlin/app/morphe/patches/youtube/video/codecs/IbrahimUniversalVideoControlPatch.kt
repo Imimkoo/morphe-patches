@@ -68,7 +68,7 @@ val ibrahimUniversalVideoControlPatch = patch(
             0,
             """
                 if-eqz p1, :ibrahim_no_dav1d
-                iget-object v0, p1, Ldefpackage/edc;->q:Ljava/lang/String;
+                iget-object v0, p1, Ledc;->q:Ljava/lang/String;
                 const-string v1, "video/av01"
                 invoke-virtual {v1, v0}, Ljava/lang/String;->equalsIgnoreCase(Ljava/lang/String;)Z
                 move-result v0
@@ -86,7 +86,7 @@ val ibrahimUniversalVideoControlPatch = patch(
         EmbeddedDav1dSelectionFingerprint.method.addInstructionsWithLabels(
             0,
             """
-                invoke-direct {p0, p1}, Ldefpackage/sun;->bw(Ldefpackage/edc;)Z
+                invoke-virtual {p0, p1}, Lsun;->bw(Ledc;)Z
                 move-result v0
                 return v0
             """
@@ -96,7 +96,7 @@ val ibrahimUniversalVideoControlPatch = patch(
         EmbeddedDav1dRendererStateFingerprint.method.addInstructionsWithLabels(
             0,
             """
-                sget-object v0, Ldefpackage/aovd;->g:Ldefpackage/aovd;
+                sget-object v0, Laovd;->g:Laovd;
                 if-ne p1, v0, :ibrahim_media_codec
                 const-string v0, "DAV1D"
                 invoke-static {v0}, $IBRAHIM_CLASS->setRendererState(Ljava/lang/String;)V
