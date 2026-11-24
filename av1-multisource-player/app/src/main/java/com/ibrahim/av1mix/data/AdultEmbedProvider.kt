@@ -1,23 +1,19 @@
 package com.ibrahim.av1mix.data
 
-import okhttp3.HttpUrl.Companion.toHttpUrl
+import com.google.gson.JsonArray
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONArray
-import org.json.JSONObject
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 /**
  * Uses AdultEmbed's documented v1 search and its own permanent iframe player.
  * No source-page scraping, direct-file extraction, or ad/player modification.
- *
- * Admission is limited to the provider's published app/API/embed workflow:
- * the v1 docs explicitly describe app integrations and official player URLs;
- * the service states that only approved, playable entries are returned and
- * documents removal/takedown synchronization and originating-provider 18+ records.
  */
 class AdultEmbedProvider(
     private val client: OkHttpClient = OkHttpClient.Builder()
@@ -38,6 +34,8 @@ class AdultEmbedProvider(
         supportsCodecSelection = false,
     )
 
+    // The provider's published v1 documentation explicitly covers apps and official embeds.
+    // Content-rights and 18+ provenance remain provider representations, not an independent audit.
     override val approval = ProviderApproval(
         termsReviewed = true,
         playbackPermissionConfirmed = true,
@@ -54,55 +52,53 @@ class AdultEmbedProvider(
                 .addQueryParameter("lang", "ar")
                 .addQueryParameter("sort", if (query.isBlank()) "popular" else "newest")
             if (query.isNotBlank()) builder.addQueryParameter("query", query.trim().take(120))
-            parseResults(getJson(builder.build().toString()).optJSONArray("results"))
+            parseResults(getJson(builder.build().toString()).getAsJsonArray("results"))
         }
 
     override suspend fun related(canonicalId: String): List<NormalizedVideo> =
         withContext(Dispatchers.IO) {
             val id = canonicalId.toLongOrNull() ?: return@withContext emptyList()
             val json = getJson(endpoint("videos/$id/related").toString())
-            parseResults(json.optJSONArray("results"))
+            parseResults(json.getAsJsonArray("results"))
         }
 
     override suspend fun isAvailable(canonicalId: String): Boolean =
         withContext(Dispatchers.IO) {
             val id = canonicalId.toLongOrNull() ?: return@withContext false
             val json = getJson(endpoint("videos/$id/status").toString())
-            json.optBoolean("active", json.optBoolean("playable", false)) ||
-                json.optString("status").equals("active", ignoreCase = true)
+            json.booleanOrNull("active")
+                ?: json.booleanOrNull("playable")
+                ?: json.stringOrNull("status").equals("active", ignoreCase = true)
         }
 
-    private fun parseResults(rows: JSONArray?): List<NormalizedVideo> = buildList {
+    private fun parseResults(rows: JsonArray?): List<NormalizedVideo> = buildList {
         if (rows == null) return@buildList
-        for (index in 0 until rows.length()) {
-            val row = rows.optJSONObject(index) ?: continue
-            val id = row.optString("id").takeIf { it.isNotBlank() } ?: continue
-            val embed = row.optJSONObject("embed")
-            val playbackUrl = embed?.optString("url")
+        for (element in rows) {
+            if (!element.isJsonObject) continue
+            val row = element.asJsonObject
+            val id = row.stringOrNull("id")?.takeIf { it.isNotBlank() } ?: continue
+            val embed = row.objectOrNull("embed")
+            val playbackUrl = embed?.stringOrNull("url")
                 ?.takeIf { isOfficialPlayerUrl(it, id) }
                 ?: "https://adultembed.com/player/embed/$id/"
-            val thumbnail = row.optString("thumbnail").takeIf { it.startsWith("https://") }
-            val tags = readNames(row.optJSONArray("tags"))
-            val performers = readNames(row.optJSONArray("performers"))
-            val studio = row.optJSONObject("studio")
-            val duration = row.optDouble("duration_seconds", -1.0)
-                .takeIf { it >= 0.0 }?.toLong()
-                ?: parseDuration(row.optString("duration"))
-            val publishedAt = row.optString("published_at")
-                .takeIf { it.isNotBlank() }
+            val thumbnail = row.stringOrNull("thumbnail")?.takeIf { it.startsWith("https://") }
+            val duration = row.doubleOrNull("duration_seconds")
+                ?.takeIf { it >= 0.0 }?.toLong()
+                ?: parseDuration(row.stringOrNull("duration").orEmpty())
+            val publishedAt = row.stringOrNull("published_at")
                 ?.let { runCatching { Instant.parse(it).epochSecond }.getOrNull() }
 
             add(
                 NormalizedVideo(
                     providerId = providerId,
                     canonicalId = id,
-                    title = row.optString("title").ifBlank { "فيديو بدون عنوان" },
+                    title = row.stringOrNull("title").orEmpty().ifBlank { "فيديو بدون عنوان" },
                     durationSeconds = duration,
                     thumbnailUrl = thumbnail,
                     canonicalPageUrl = playbackUrl,
-                    tags = tags,
-                    performerIds = performers,
-                    studioId = studio?.optString("slug")?.takeIf { it.isNotBlank() },
+                    tags = readNames(row.arrayOrNull("tags")),
+                    performerIds = readNames(row.arrayOrNull("performers")),
+                    studioId = row.objectOrNull("studio")?.stringOrNull("slug"),
                     updatedAtEpochSeconds = publishedAt,
                     playbackUrl = playbackUrl,
                 )
@@ -110,16 +106,19 @@ class AdultEmbedProvider(
         }
     }
 
-    private fun readNames(array: JSONArray?): List<String> {
+    private fun readNames(array: JsonArray?): List<String> {
         if (array == null) return emptyList()
         return buildList {
-            for (index in 0 until array.length()) {
-                val value = array.opt(index)
-                val name = when (value) {
-                    is JSONObject -> value.optString("slug").ifBlank { value.optString("name") }
-                    else -> value?.toString().orEmpty()
+            for (element in array) {
+                val name = when {
+                    element.isJsonObject -> {
+                        val row = element.asJsonObject
+                        row.stringOrNull("slug") ?: row.stringOrNull("name")
+                    }
+                    element.isJsonPrimitive -> element.asString
+                    else -> null
                 }
-                if (name.isNotBlank()) add(name)
+                if (!name.isNullOrBlank()) add(name)
             }
         }.distinct().take(24)
     }
@@ -146,7 +145,7 @@ class AdultEmbedProvider(
     private fun endpoint(path: String) =
         "https://adultembed.com/api/v1/$path".toHttpUrl()
 
-    private fun getJson(url: String): JSONObject {
+    private fun getJson(url: String): JsonObject {
         val request = Request.Builder()
             .url(url)
             .header("Accept", "application/json")
@@ -156,7 +155,28 @@ class AdultEmbedProvider(
             if (!response.isSuccessful) {
                 throw IllegalStateException("AdultEmbed API returned HTTP ${response.code}")
             }
-            JSONObject(response.body?.string() ?: "{}")
+            JsonParser.parseString(response.body?.string() ?: "{}").asJsonObject
         }
     }
+
+    private fun JsonObject.stringOrNull(name: String): String? =
+        get(name)?.takeUnless { it.isJsonNull }?.let {
+            runCatching { it.asString }.getOrNull()
+        }
+
+    private fun JsonObject.booleanOrNull(name: String): Boolean? =
+        get(name)?.takeUnless { it.isJsonNull }?.let {
+            runCatching { it.asBoolean }.getOrNull()
+        }
+
+    private fun JsonObject.doubleOrNull(name: String): Double? =
+        get(name)?.takeUnless { it.isJsonNull }?.let {
+            runCatching { it.asDouble }.getOrNull()
+        }
+
+    private fun JsonObject.objectOrNull(name: String): JsonObject? =
+        get(name)?.takeIf { it.isJsonObject }?.asJsonObject
+
+    private fun JsonObject.arrayOrNull(name: String): JsonArray? =
+        get(name)?.takeIf { it.isJsonArray }?.asJsonArray
 }
