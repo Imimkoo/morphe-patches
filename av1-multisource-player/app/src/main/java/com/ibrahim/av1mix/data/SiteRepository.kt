@@ -176,11 +176,20 @@ class SiteRepository {
     }
 
     private fun isReachable(url: String, referer: String): Boolean {
+        val headers = mapOf(
+            "User-Agent" to "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36",
+            "Referer" to referer
+        )
         return try {
-            val request = Request.Builder().url(url).head()
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36")
-                .header("Referer", referer).build()
-            client.newCall(request).execute().use { it.isSuccessful }
+            val head = Request.Builder().url(url).head().headers(okhttp3.Headers.headersOf(*headers.flatMap { listOf(it.key, it.value) }.toTypedArray())).build()
+            val headOk = client.newCall(head).execute().use { it.isSuccessful }
+            if (headOk) true else {
+                val ranged = Request.Builder().url(url).get()
+                    .header("User-Agent", headers.getValue("User-Agent"))
+                    .header("Referer", referer)
+                    .header("Range", "bytes=0-0").build()
+                client.newCall(ranged).execute().use { it.code == 200 || it.code == 206 }
+            }
         } catch (_: Exception) {
             false
         }
@@ -278,7 +287,7 @@ class SiteRepository {
             val bytes = ByteArray(hex.length / 2) { index ->
                 hex.substring(index * 2, index * 2 + 2).toInt(16).toByte()
             }
-            if (bytes.size < 6) return null
+            if (hex.length % 2 != 0 || bytes.size < 6) return null
             val algorithm = bytes[0].toInt() and 0xff
             val seed = java.nio.ByteBuffer.wrap(bytes.copyOfRange(1, 5))
                 .order(java.nio.ByteOrder.LITTLE_ENDIAN).int
