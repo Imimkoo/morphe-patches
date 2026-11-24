@@ -42,6 +42,13 @@ internal object OfficialEmbedPage {
         """.trimIndent()
     }
 
+    fun origin(playerUrl: String): String {
+        require(isAllowedPlayerUrl(playerUrl)) { "Untrusted or invalid official player URL" }
+        val uri = URI(playerUrl)
+        val port = if (uri.port == -1 || uri.port == 443) "" else ":${uri.port}"
+        return "https://${uri.host}$port/"
+    }
+
     fun isAllowedPlayerUrl(value: String): Boolean {
         val uri = runCatching { URI(value) }.getOrNull() ?: return false
         return uri.scheme.equals("https", ignoreCase = true) &&
