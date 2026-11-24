@@ -89,7 +89,8 @@ import com.ibrahim.av1mix.data.LocalPreferenceStore
 import com.ibrahim.av1mix.data.ProviderRegistry
 import com.ibrahim.av1mix.data.WatchHistoryEntry
 import com.ibrahim.av1mix.data.WatchHistoryStore
-import kotlinx.coroutines.launch\nimport kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 private val AppBackground = Color(0xFF090C10)
 private val AppSurface = Color(0xFF151B22)
