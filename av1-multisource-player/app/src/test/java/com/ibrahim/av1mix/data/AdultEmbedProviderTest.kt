@@ -50,6 +50,21 @@ class AdultEmbedProviderTest {
     }
 
     @Test
+    fun discoverMergesPopularNewestAndLongestFeeds() = runBlocking {
+        val requests = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val source = provider(
+            """{"results":[{"id":12345,"title":"Fixture","embed":{"url":"https://adultembed.com/player/embed/12345/"}}]}""",
+            requests
+        )
+        val results = source.discover()
+        assertEquals(1, results.size)
+        assertEquals(3, requests.size)
+        assertTrue(requests.any { it.contains("sort=popular") })
+        assertTrue(requests.any { it.contains("sort=newest") })
+        assertTrue(requests.any { it.contains("sort=longest") })
+    }
+
+    @Test
     fun providerDoesNotClaimDirectStreamOfflineOrCodecControl() {
         val source = provider("""{"results":[]}""")
         assertEquals(PlaybackKind.OFFICIAL_EMBED, source.capabilities.playbackKind)
