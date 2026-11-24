@@ -259,7 +259,7 @@ private fun PlayerScreen(item: VideoItem, stream: StreamCandidate, onBack: () ->
                 Text(item.title, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp)
             }
         }
-        AndroidView(Modifier.fillMaxWidth().weight(1f), factory = { ctx ->
+        AndroidView(modifier = Modifier.fillMaxWidth().weight(1f), factory = { ctx ->
             PlayerView(ctx).apply {
                 this.player = player
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -292,7 +292,7 @@ private fun SiteWebFallback(
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White) }
             Text(item.siteName + " · اكتشاف مصدر الفيديو", color = Color.White, fontWeight = FontWeight.SemiBold)
         }
-        AndroidView(Modifier.fillMaxSize(), factory = { ctx ->
+        AndroidView(modifier = Modifier.fillMaxSize(), factory = { ctx ->
             WebView(ctx).apply {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
