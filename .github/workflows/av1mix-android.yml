@@ -58,9 +58,26 @@ jobs:
             echo "Search result did not include a numeric video ID."
             exit 1
           }
-          PLAYER_URL="https://adultembed.com/player/embed/${VIDEO_ID}/"
-          [[ "${PLAYER_URL}" == https://adultembed.com/player/embed/* ]] || exit 1
-          echo "Official player URL pattern validated."
+          PLAYER_URL="$(jq -r '.results[0].embed.url // empty' /tmp/adultembed-search.json)"
+          if [[ -z "${PLAYER_URL}" ]]; then
+            PLAYER_URL="https://adultembed.com/player/embed/${VIDEO_ID}/"
+          fi
+          [[ "${PLAYER_URL}" =~ ^https://adultembed\.com/player/embed/[0-9]+/$ ]] || {
+            echo "Search result did not contain a valid official player URL."
+            exit 1
+          }
+          PLAYER_CODE="$(curl --location --silent --show-error --max-time 30 -w '%{http_code}' \
+            -H 'Referer: https://adultembed.com/' \
+            -A 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36' \
+            "${PLAYER_URL}" -o /tmp/adultembed-player.html)"
+          echo "Official player HTTP: ${PLAYER_CODE}; bytes: $(wc -c </tmp/adultembed-player.html)"
+          test "${PLAYER_CODE}" = "200"
+          test "$(wc -c </tmp/adultembed-player.html)" -gt 500
+          grep -Eiq 'player|iframe|video|script' /tmp/adultembed-player.html || {
+            echo "Official player response does not resemble a playable player document."
+            exit 1
+          }
+          echo "Official player endpoint returned a non-empty player document."
           STATUS_CODE="$(curl --silent --show-error --max-time 25 -w '%{http_code}' \
             "https://adultembed.com/api/v1/videos/${VIDEO_ID}/status" \
             -o /tmp/adultembed-status.json)"
