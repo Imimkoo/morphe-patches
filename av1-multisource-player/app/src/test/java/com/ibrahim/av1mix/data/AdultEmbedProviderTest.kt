@@ -66,6 +66,17 @@ class AdultEmbedProviderTest {
     }
 
     @Test
+    fun playerUrlMustMatchTheExactVideoId() = runBlocking {
+        val source = provider(
+            """{"results":[{"id":1234,"title":"Fixture","embed":{"url":"https://adultembed.com/player/embed/12345/"}}]}"""
+        )
+        assertEquals(
+            "https://adultembed.com/player/embed/1234/",
+            source.search("", 1).single().playbackUrl
+        )
+    }
+
+    @Test
     fun unsafeEmbedHostIsReplacedByProviderCanonicalPlayer() = runBlocking {
         val source = provider(
             """{"results":[{"id":12345,"title":"Fixture","embed":{"url":"https://evil.invalid/player/embed/12345/"}}]}"""
