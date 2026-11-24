@@ -451,16 +451,14 @@ private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, pre
                                 pageLoading = false
                             }
                             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                                val isPlayerFrame = request?.url?.host == playerHost &&
-                                    request.url.path?.startsWith("/player/embed/") == true
+                                val isPlayerFrame = request?.url?.let { it.host == playerHost && it.path?.startsWith("/player/embed/") == true } == true
                                 if (request?.isForMainFrame == true || isPlayerFrame) {
                                     pageLoading = false
                                     playerError = "تعذر تحميل صفحة المشغّل (${error?.errorCode ?: "شبكة"})"
                                 }
                             }
                             override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
-                                val isPlayerFrame = request?.url?.host == playerHost &&
-                                    request.url.path?.startsWith("/player/embed/") == true
+                                val isPlayerFrame = request?.url?.let { it.host == playerHost && it.path?.startsWith("/player/embed/") == true } == true
                                 if ((request?.isForMainFrame == true || isPlayerFrame) &&
                                     (errorResponse?.statusCode ?: 200) >= 400) {
                                     pageLoading = false
