@@ -118,6 +118,11 @@ jobs:
           unzip -l "$APK" | tee native-libraries.txt
           grep -E 'lib/arm64-v8a/.*(avcodec|dav1d|ffmpeg)' native-libraries.txt
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
+          KEY_CERT="$(keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey | awk -F': ' '/SHA256:/{print $2}' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          APK_CERT="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" | awk '/Signer #1 certificate SHA-256 digest:/{print $NF}')"
+          echo "Persistent keystore certificate: ${KEY_CERT}"
+          echo "APK signer certificate: ${APK_CERT}"
+          test "${KEY_CERT}" = "${APK_CERT}"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee package-info.txt
           grep -F "package: name='com.ibrahim.av1mix.next' versionCode='3' versionName='0.3.0'" package-info.txt
           unzip -p "$APK" lib/arm64-v8a/libavcodec.so > /tmp/av1mix-libavcodec.so
