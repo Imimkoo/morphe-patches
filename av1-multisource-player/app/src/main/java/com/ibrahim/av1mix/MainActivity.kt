@@ -89,7 +89,7 @@ import com.ibrahim.av1mix.data.LocalPreferenceStore
 import com.ibrahim.av1mix.data.ProviderRegistry
 import com.ibrahim.av1mix.data.WatchHistoryEntry
 import com.ibrahim.av1mix.data.WatchHistoryStore
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.launch\nimport kotlinx.coroutines.delay
 
 private val AppBackground = Color(0xFF090C10)
 private val AppSurface = Color(0xFF151B22)
@@ -397,6 +397,15 @@ private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, pre
     LaunchedEffect(video.providerId, video.canonicalId) {
         relatedVideos = runCatching { registry.related(video) }.getOrDefault(emptyList())
     }
+    LaunchedEffect(video.providerId, video.canonicalId, reloadKey) {
+        pageLoading = true
+        playerError = null
+        delay(25_000)
+        if (pageLoading) {
+            pageLoading = false
+            playerError = "المشغّل لم يؤكد تحميل إطار الفيديو خلال 25 ثانية"
+        }
+    }
     DisposableEffect(video.providerId, video.canonicalId) {
         onDispose {
             if (!currentPageLoading && currentPlayerError == null) {
@@ -447,9 +456,6 @@ private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, pre
                                 pageLoading = true
                                 playerError = null
                             }
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                pageLoading = false
-                            }
                             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                                 val isPlayerFrame = request?.url?.let { it.host == playerHost && it.path?.startsWith("/player/embed/") == true } == true
                                 if (request?.isForMainFrame == true || isPlayerFrame) {
@@ -472,6 +478,18 @@ private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, pre
                             }
                         }
                         webChromeClient = object : WebChromeClient() {
+                            override fun onReceivedTitle(view: WebView?, title: String?) {
+                                when (title) {
+                                    "AV1Mix player frame loaded" -> {
+                                        pageLoading = false
+                                        playerError = null
+                                    }
+                                    "AV1Mix player frame failed" -> {
+                                        pageLoading = false
+                                        playerError = "المصدر لم يستطع تحميل إطار الفيديو"
+                                    }
+                                }
+                            }
                             override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
                                 android.util.Log.d("AV1MixPlayer", consoleMessage?.message().orEmpty())
                                 return true
