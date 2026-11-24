@@ -71,6 +71,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.ibrahim.av1mix.data.AdultEmbedProvider
 import com.ibrahim.av1mix.data.NormalizedVideo
+import com.ibrahim.av1mix.data.LocalPreferenceStore
 import com.ibrahim.av1mix.data.ProviderRegistry
 import com.ibrahim.av1mix.data.WatchHistoryEntry
 import com.ibrahim.av1mix.data.WatchHistoryStore
@@ -97,6 +98,7 @@ private fun AV1MixApp() {
     val context = LocalContext.current
     val registry = remember { ProviderRegistry(listOf(AdultEmbedProvider())) }
     val history = remember { WatchHistoryStore(context) }
+    val localPreferences = remember { LocalPreferenceStore(context) }
     val scope = rememberCoroutineScope()
     var tab by remember { mutableStateOf(MainTab.HOME) }
     var query by remember { mutableStateOf("") }
@@ -124,7 +126,7 @@ private fun AV1MixApp() {
             }
         } else if (selectedVideo != null) {
             BackHandler { selectedVideo = null }
-            PlayerScreen(video = selectedVideo!!, registry = registry, onBack = { selectedVideo = null }, onOpenRelated = { related -> history.add(related); historyVersion++; selectedVideo = related })
+            PlayerScreen(video = selectedVideo!!, registry = registry, preferences = localPreferences, onBack = { selectedVideo = null }, onOpenRelated = { related -> history.add(related); historyVersion++; selectedVideo = related })
         } else {
             Scaffold(
                 containerColor = AppBackground,
@@ -140,6 +142,7 @@ private fun AV1MixApp() {
                 when (tab) {
                     MainTab.HOME -> HomeScreen(
                         registry = registry,
+                        preferences = localPreferences,
                         modifier = Modifier.padding(padding),
                         onOpen = { video ->
                             history.add(video)
@@ -149,6 +152,7 @@ private fun AV1MixApp() {
                     )
                     MainTab.SEARCH -> SearchScreen(
                         registry = registry,
+                        preferences = localPreferences,
                         query = query,
                         onQueryChange = { query = it },
                         modifier = Modifier.padding(padding),
@@ -167,7 +171,7 @@ private fun AV1MixApp() {
                         },
                         onClear = { history.clear(); historyVersion++ }
                     )
-                    MainTab.SETTINGS -> SettingsScreen(Modifier.padding(padding))
+                    MainTab.SETTINGS -> SettingsScreen(preferences = localPreferences, modifier = Modifier.padding(padding))
                 }
             }
         }
@@ -219,6 +223,7 @@ private fun PageHeader(subtitle: String) {
 @Composable
 private fun HomeScreen(
     registry: ProviderRegistry,
+    preferences: LocalPreferenceStore,
     modifier: Modifier = Modifier,
     onOpen: (NormalizedVideo) -> Unit
 ) {
@@ -231,7 +236,7 @@ private fun HomeScreen(
         loading = true
         error = null
         try {
-            videos = registry.search("", 1)
+            videos = preferences.rank(registry.search("", 1))
         } catch (exception: Exception) {
             error = exception.message ?: "تعذر الاتصال بالمصدر"
         } finally {
@@ -271,6 +276,7 @@ private fun HomeScreen(
 @Composable
 private fun SearchScreen(
     registry: ProviderRegistry,
+    preferences: LocalPreferenceStore,
     query: String,
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -302,7 +308,7 @@ private fun SearchScreen(
                         loading = true
                         searched = true
                         error = null
-                        try { results = registry.search(query, 1) }
+                        try { results = preferences.rank(registry.search(query, 1)) }
                         catch (exception: Exception) { error = exception.message ?: "تعذر البحث" }
                         finally { loading = false }
                     }
@@ -358,10 +364,11 @@ private fun VideoCard(video: NormalizedVideo, onClick: () -> Unit) {
 }
 
 @Composable
-private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, onBack: () -> Unit, onOpenRelated: (NormalizedVideo) -> Unit) {
+private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, preferences: LocalPreferenceStore, onBack: () -> Unit, onOpenRelated: (NormalizedVideo) -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var playerWebView by remember(video.providerId, video.canonicalId) { mutableStateOf<WebView?>(null) }
     var relatedVideos by remember(video.providerId, video.canonicalId) { mutableStateOf<List<NormalizedVideo>>(emptyList()) }
+    var feedbackMessage by remember(video.providerId, video.canonicalId) { mutableStateOf("") }
     LaunchedEffect(video.providerId, video.canonicalId) {
         relatedVideos = runCatching { registry.related(video) }.getOrDefault(emptyList())
     }
@@ -423,6 +430,28 @@ private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, onB
                 fontSize = 12.sp,
                 lineHeight = 18.sp
             )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        preferences.recordFeedback(video, liked = true)
+                        feedbackMessage = "هنحسّن الاقتراحات بناءً على اختيارك"
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AppAccent),
+                    modifier = Modifier.weight(1f)
+                ) { Text("👍 يعجبني", color = Color.Black) }
+                Button(
+                    onClick = {
+                        preferences.recordFeedback(video, liked = false)
+                        feedbackMessage = "هنقلّل اقتراحات المحتوى المشابه"
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF303943)),
+                    modifier = Modifier.weight(1f)
+                ) { Text("مش مهتم", color = Color.White) }
+            }
+            if (feedbackMessage.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(feedbackMessage, color = AppMuted, fontSize = 11.sp)
+            }
             if (relatedVideos.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
                 Text("فيديوهات مشابهة", color = Color.White, fontWeight = FontWeight.Bold)
@@ -486,14 +515,20 @@ private fun HistoryScreen(
 }
 
 @Composable
-private fun SettingsScreen(modifier: Modifier = Modifier) {
+private fun SettingsScreen(preferences: LocalPreferenceStore, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxSize()) {
         PageHeader("إعدادات التشغيل والخصوصية")
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingsCard("المصادر", "يتم استخدام واجهة البحث ومشغّل AdultEmbed الرسمي. لا يتم استخراج روابط الفيديو أو تجاوز مشغلات المواقع.")
             SettingsCard("AV1 والجودة", "هذا المصدر يشغّل الفيديو داخل مشغّله الرسمي؛ اختيار الترميز والجودة يخضع للمصدر ولا يمكن فرض AV1 من التطبيق.")
             SettingsCard("التخزين المؤقت", "المشغّل الرسمي يدير التخزين المؤقت داخليًا. التحكم المتقدم في Buffer والتنزيل الدائم غير متاحين لهذا المصدر.")
-            SettingsCard("الخصوصية", "سجل المشاهدة محفوظ محليًا على الجهاز ويمكن مسحه من صفحة السجل.")
+            SettingsCard("التوصيات", "يتعلم التطبيق من تقييمك للفيديوهات ويرفع أو يخفض أوزان الوسوم والأشخاص محليًا على الجهاز.")
+            Button(
+                onClick = { preferences.clear() },
+                colors = ButtonDefaults.buttonColors(containerColor = AppSurface),
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("مسح تفضيلات التوصيات") }
+            SettingsCard("الخصوصية", "سجل المشاهدة وتفضيلات التوصيات محفوظان محليًا على الجهاز.")
             SettingsCard("إصدار التطبيق", "0.2.0-alpha01")
         }
     }
