@@ -63,7 +63,7 @@ jobs:
             PLAYER_URL="https://adultembed.com/player/embed/${VIDEO_ID}/"
           fi
           PLAYER_PATH="${PLAYER_URL%%\?*}"
-          [[ "${PLAYER_PATH}" =~ ^https://adultembed\\.com/player/embed/[0-9]+/$ ]] || {
+          [[ "${PLAYER_PATH}" =~ ^https://(adultembed\\.com|pornalizer\\.app)/player/embed/[0-9]+/$ ]] || {
             echo "Search result did not contain a valid official player URL."
             echo "Returned URL host/path: $(python3 -c 'import sys,urllib.parse; u=urllib.parse.urlparse(sys.argv[1]); print(u.scheme, u.netloc, u.path)' "${PLAYER_URL}")"
             exit 1
