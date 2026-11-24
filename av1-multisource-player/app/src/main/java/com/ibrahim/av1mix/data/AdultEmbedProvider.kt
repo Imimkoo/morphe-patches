@@ -1,6 +1,8 @@
 package com.ibrahim.av1mix.data
 
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -43,31 +45,32 @@ class AdultEmbedProvider(
         adultContentProvenanceReviewed = true,
     )
 
-    override suspend fun search(query: String, page: Int): List<NormalizedVideo> {
-        val url = endpoint("search").newBuilder()
-            .addQueryParameter("query", query.trim().take(120).ifBlank { null })
-            .addQueryParameter("page", page.coerceAtLeast(1).toString())
-            .addQueryParameter("per_page", "24")
-            .addQueryParameter("quality", "complete")
-            .addQueryParameter("lang", "ar")
-            .addQueryParameter("sort", if (query.isBlank()) "popular" else "newest")
-            .build()
-        val json = getJson(url.toString())
-        return parseResults(json.optJSONArray("results"))
-    }
+    override suspend fun search(query: String, page: Int): List<NormalizedVideo> =
+        withContext(Dispatchers.IO) {
+            val builder = endpoint("search").newBuilder()
+                .addQueryParameter("page", page.coerceAtLeast(1).toString())
+                .addQueryParameter("per_page", "24")
+                .addQueryParameter("quality", "complete")
+                .addQueryParameter("lang", "ar")
+                .addQueryParameter("sort", if (query.isBlank()) "popular" else "newest")
+            if (query.isNotBlank()) builder.addQueryParameter("query", query.trim().take(120))
+            parseResults(getJson(builder.build().toString()).optJSONArray("results"))
+        }
 
-    override suspend fun related(canonicalId: String): List<NormalizedVideo> {
-        val id = canonicalId.toLongOrNull() ?: return emptyList()
-        val json = getJson(endpoint("videos/$id/related").toString())
-        return parseResults(json.optJSONArray("results"))
-    }
+    override suspend fun related(canonicalId: String): List<NormalizedVideo> =
+        withContext(Dispatchers.IO) {
+            val id = canonicalId.toLongOrNull() ?: return@withContext emptyList()
+            val json = getJson(endpoint("videos/$id/related").toString())
+            parseResults(json.optJSONArray("results"))
+        }
 
-    override suspend fun isAvailable(canonicalId: String): Boolean {
-        val id = canonicalId.toLongOrNull() ?: return false
-        val json = getJson(endpoint("videos/$id/status").toString())
-        return json.optBoolean("active", json.optBoolean("playable", false)) ||
-            json.optString("status").equals("active", ignoreCase = true)
-    }
+    override suspend fun isAvailable(canonicalId: String): Boolean =
+        withContext(Dispatchers.IO) {
+            val id = canonicalId.toLongOrNull() ?: return@withContext false
+            val json = getJson(endpoint("videos/$id/status").toString())
+            json.optBoolean("active", json.optBoolean("playable", false)) ||
+                json.optString("status").equals("active", ignoreCase = true)
+        }
 
     private fun parseResults(rows: JSONArray?): List<NormalizedVideo> = buildList {
         if (rows == null) return@buildList
