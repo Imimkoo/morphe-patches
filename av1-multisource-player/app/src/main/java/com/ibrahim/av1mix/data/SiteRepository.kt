@@ -80,6 +80,9 @@ class SiteRepository {
             if (item.siteId == "eporner") {
                 resolveEporner(item, html)?.let { return@withContext it }
             }
+            if (item.siteId == "xhamster") {
+                resolveXHamster(item, html)?.let { return@withContext it }
+            }
             val doc = Jsoup.parse(html, item.pageUrl)
             val urls = LinkedHashSet<String>()
             doc.select("video[src], video source[src], source[src], video[data-src]").forEach { el ->
@@ -181,6 +184,159 @@ class SiteRepository {
         } catch (_: Exception) {
             false
         }
+    }
+
+
+    private fun resolveXHamster(item: VideoItem, html: String): StreamCandidate? {
+        return try {
+            val initialText = Regex(
+                """window\.initials\s*=\s*(\{.+?\})\s*;\s*</script>""",
+                setOf(RegexOption.DOT_MATCHES_ALL)
+            ).find(html)?.groupValues?.get(1) ?: return null
+            val initials = JSONObject(initialText)
+            val av1 = LinkedHashSet<String>()
+            val standard = LinkedHashSet<String>()
+
+            val videoModel = initials.optJSONObject("videoModel")
+            val modelSources = videoModel?.optJSONObject("sources")
+            if (modelSources != null) {
+                val ids = modelSources.keys()
+                while (ids.hasNext()) {
+                    val formatId = ids.next()
+                    val variants = modelSources.optJSONObject(formatId) ?: continue
+                    val qualities = variants.keys()
+                    while (qualities.hasNext()) {
+                        val raw = variants.optString(qualities.next())
+                        val decoded = decipherXHamsterUrl(raw) ?: continue
+                        if (formatId.contains("av1", true) || decoded.contains(".av1.", true)) av1 += decoded
+                        else standard += decoded
+                    }
+                }
+            }
+
+            val xplayerSources = initials.optJSONObject("xplayerSettings")?.optJSONObject("sources")
+            val standardSources = xplayerSources?.optJSONObject("standard")
+            if (standardSources != null) {
+                val ids = standardSources.keys()
+                while (ids.hasNext()) {
+                    val formatId = ids.next()
+                    val formats = standardSources.optJSONArray(formatId) ?: continue
+                    for (i in 0 until formats.length()) {
+                        val format = formats.optJSONObject(i) ?: continue
+                        for (key in listOf("url", "fallback")) {
+                            val raw = format.optString(key)
+                            if (raw.isBlank()) continue
+                            val decoded = decipherXHamsterUrl(raw) ?: continue
+                            if (formatId.contains("av1", true) || decoded.contains(".av1.", true)) av1 += decoded
+                            else standard += decoded
+                        }
+                    }
+                }
+            }
+
+            val hlsSources = xplayerSources?.optJSONObject("hls")
+            if (hlsSources != null) {
+                for (key in listOf("url", "fallback")) {
+                    val raw = hlsSources.optString(key)
+                    if (raw.isBlank()) continue
+                    decipherXHamsterUrl(raw)?.let { standard += it }
+                }
+            }
+
+            val selectedAv1 = av1.firstOrNull { it.startsWith("https://") }
+            val selected = selectedAv1 ?: standard.firstOrNull { it.startsWith("https://") } ?: return null
+            StreamCandidate(
+                url = selected,
+                mimeType = if (selected.contains(".m3u8")) "application/x-mpegURL" else "video/mp4",
+                codec = if (selectedAv1 != null) "AV1 variant decoded from XHamster player config; verify actual decoder" else "XHamster fallback; codec pending player inspection",
+                referer = item.pageUrl,
+                siteName = item.siteName
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun decipherXHamsterUrl(value: String): String? {
+        return try {
+            if (Regex("[0-9a-fA-F]{12,}").matches(value)) {
+                return decipherXHamsterHex(value)
+            }
+            val uri = URI(value)
+            val match = Regex("^/([0-9a-fA-F]{12,})([/,].+)$").find(uri.rawPath ?: "") ?: return if (uri.scheme == "https" && uri.host != null) value else null
+            val encrypted = match.groupValues[1]
+            val remainder = match.groupValues[2]
+            val decoded = decipherXHamsterHex(encrypted) ?: return null
+            value.replace("/" + encrypted + remainder, "/" + decoded + remainder)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun decipherXHamsterHex(hex: String): String? {
+        return try {
+            val bytes = ByteArray(hex.length / 2) { index ->
+                hex.substring(index * 2, index * 2 + 2).toInt(16).toByte()
+            }
+            if (bytes.size < 6) return null
+            val algorithm = bytes[0].toInt() and 0xff
+            val seed = java.nio.ByteBuffer.wrap(bytes.copyOfRange(1, 5))
+                .order(java.nio.ByteOrder.LITTLE_ENDIAN).int
+            val state = intArrayOf(seed)
+            val output = ByteArray(bytes.size - 5)
+            for (i in output.indices) output[i] = (bytes[i + 5].toInt() xor nextXHamsterByte(algorithm, state)).toByte()
+            String(output, Charsets.ISO_8859_1)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun nextXHamsterByte(algorithm: Int, state: IntArray): Int {
+        var s = state[0]
+        s = when (algorithm) {
+            1 -> s * 1664525 + 1013904223
+            2 -> {
+                s = s xor (s shl 13)
+                s = s xor (s ushr 17)
+                s xor (s shl 5)
+            }
+            3 -> {
+                s += 0x9e3779b9.toInt()
+                s = s xor (s ushr 16)
+                s *= 0x85ebca77.toInt()
+                s = s xor (s ushr 13)
+                s *= 0xc2b2ae3d.toInt()
+                s xor (s ushr 16)
+            }
+            4 -> {
+                s += 0x6d2b79f5
+                s = Integer.rotateLeft(s, 7)
+                s += 0x9e3779b9.toInt()
+                s = s xor (s ushr 11)
+                s * 0x27d4eb2d
+            }
+            5 -> {
+                s = s xor (s shl 7)
+                s = s xor (s ushr 9)
+                s = s xor (s shl 8)
+                s + 0xa5a5a5a5.toInt()
+            }
+            6 -> {
+                s = s * 0x2c9277b5 + 0xac564b05.toInt()
+                val mixed = s xor (s ushr 18)
+                mixed ushr ((s ushr 27) and 31)
+            }
+            7 -> {
+                s += 0x9e3779b9.toInt()
+                var e = s xor (s shl 5)
+                e *= 0x7feb352d
+                e = e xor (e ushr 15)
+                e * 0x846ca68b.toInt()
+            }
+            else -> return 0
+        }
+        state[0] = s
+        return s and 0xff
     }
 
     private fun requestText(url: String, referer: String): String? {
