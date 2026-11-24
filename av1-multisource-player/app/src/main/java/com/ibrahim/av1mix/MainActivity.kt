@@ -1,7 +1,19 @@
 package com.ibrahim.av1mix
 
 import android.os.Bundle
+import android.content.Intent
+import android.graphics.Bitmap
+import android.net.Uri
+import android.os.SystemClock
+import android.view.View
+import android.webkit.CookieManager
+import android.webkit.SslErrorHandler
+import android.net.http.SslError
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceError
+import android.webkit.WebResourceResponse
+import android.webkit.ConsoleMessage
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -11,6 +23,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -236,7 +249,7 @@ private fun HomeScreen(
         loading = true
         error = null
         try {
-            videos = preferences.rank(registry.search("", 1))
+            videos = preferences.rank(registry.discover())
         } catch (exception: Exception) {
             error = exception.message ?: "تعذر الاتصال بالمصدر"
         } finally {
@@ -365,12 +378,24 @@ private fun VideoCard(video: NormalizedVideo, onClick: () -> Unit) {
 
 @Composable
 private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, preferences: LocalPreferenceStore, onBack: () -> Unit, onOpenRelated: (NormalizedVideo) -> Unit) {
+    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var playerWebView by remember(video.providerId, video.canonicalId) { mutableStateOf<WebView?>(null) }
     var relatedVideos by remember(video.providerId, video.canonicalId) { mutableStateOf<List<NormalizedVideo>>(emptyList()) }
+    var pageLoading by remember(video.providerId, video.canonicalId) { mutableStateOf(true) }
+    var playerError by remember(video.providerId, video.canonicalId) { mutableStateOf<String?>(null) }
+    var reloadKey by remember(video.providerId, video.canonicalId) { mutableIntStateOf(0) }
     var feedbackMessage by remember(video.providerId, video.canonicalId) { mutableStateOf("") }
+    val openedAt = remember(video.providerId, video.canonicalId) { SystemClock.elapsedRealtime() }
+
     LaunchedEffect(video.providerId, video.canonicalId) {
         relatedVideos = runCatching { registry.related(video) }.getOrDefault(emptyList())
+    }
+    DisposableEffect(video.providerId, video.canonicalId) {
+        onDispose {
+            val secondsOnScreen = ((SystemClock.elapsedRealtime() - openedAt) / 1000L).coerceAtLeast(0L)
+            preferences.recordDwell(video, secondsOnScreen)
+        }
     }
     DisposableEffect(lifecycleOwner, playerWebView) {
         val observer = LifecycleEventObserver { _, event ->
@@ -383,58 +408,128 @@ private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, pre
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+
     Column(Modifier.fillMaxSize().background(AppBackground)) {
         Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = AppSurface)) { Text("رجوع") }
-            Text(
-                video.title,
-                modifier = Modifier.weight(1f).padding(start = 10.dp),
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Text(video.title, modifier = Modifier.weight(1f).padding(start = 10.dp), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        AndroidView(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            factory = { ctx ->
-                WebView(ctx).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    settings.mediaPlaybackRequiresUserGesture = true
-                    settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                    webViewClient = WebViewClient()
-                    webChromeClient = WebChromeClient()
-                }.also { playerWebView = it }
-            },
-            update = { view ->
-                val target = video.playbackUrl ?: video.canonicalPageUrl
-                if (view.tag != target) {
-                    view.tag = target
-                    view.loadUrl(target)
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    CookieManager.getInstance().setAcceptCookie(true)
+                    WebView(ctx).apply {
+                        setBackgroundColor(android.graphics.Color.BLACK)
+                        setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.databaseEnabled = true
+                        settings.loadsImagesAutomatically = true
+                        settings.useWideViewPort = true
+                        settings.loadWithOverviewMode = true
+                        settings.mediaPlaybackRequiresUserGesture = false
+                        settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                        settings.javaScriptCanOpenWindowsAutomatically = false
+                        settings.setSupportMultipleWindows(false)
+                        settings.setSupportZoom(false)
+                        CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                                pageLoading = true
+                                playerError = null
+                            }
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                pageLoading = false
+                            }
+                            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                                if (request?.isForMainFrame == true) {
+                                    pageLoading = false
+                                    playerError = "تعذر تحميل صفحة المشغّل (${error?.errorCode ?: "شبكة"})"
+                                }
+                            }
+                            override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
+                                if (request?.isForMainFrame == true && (errorResponse?.statusCode ?: 200) >= 400) {
+                                    pageLoading = false
+                                    playerError = "المصدر رجّع خطأ HTTP ${errorResponse?.statusCode}"
+                                }
+                            }
+                            override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
+                                handler?.cancel()
+                                pageLoading = false
+                                playerError = "تعذّر التحقق من شهادة أمان المشغّل"
+                            }
+                        }
+                        webChromeClient = object : WebChromeClient() {
+                            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                                android.util.Log.d("AV1MixPlayer", consoleMessage?.message().orEmpty())
+                                return true
+                            }
+                        }
+                    }.also { playerWebView = it }
+                },
+                update = { view ->
+                    val target = video.playbackUrl ?: video.canonicalPageUrl
+                    val fingerprint = "${target}#${reloadKey}"
+                    if (view.tag != fingerprint) {
+                        view.tag = fingerprint
+                        pageLoading = true
+                        playerError = null
+                        view.loadDataWithBaseURL("https://adultembed.com/", OfficialEmbedPage.build(target), "text/html", "UTF-8", null)
+                    }
+                },
+                onRelease = { view ->
+                    view.stopLoading()
+                    view.onPause()
+                    view.removeAllViews()
+                    view.destroy()
+                    if (playerWebView === view) playerWebView = null
                 }
-            },
-            onRelease = { view ->
-                view.stopLoading()
-                view.onPause()
-                view.removeAllViews()
-                view.destroy()
-                if (playerWebView === view) playerWebView = null
+            )
+            if (pageLoading && playerError == null) {
+                Box(Modifier.fillMaxSize().background(Color(0xCC090C10)), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = AppAccent)
+                        Spacer(Modifier.height(8.dp))
+                        Text("بنحمّل المشغّل الرسمي...", color = Color.White, fontSize = 12.sp)
+                    }
+                }
             }
-        )
-        Column(Modifier.fillMaxWidth().background(AppSurface).padding(14.dp)) {
-            Text("المشغّل الرسمي للمصدر", color = AppAccent, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(4.dp))
+            if (playerError != null) {
+                Box(Modifier.fillMaxSize().background(Color(0xF2090C10)).padding(18.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(playerError ?: "تعذّر تشغيل المشغّل", color = Color.White, textAlign = TextAlign.Center)
+                        Spacer(Modifier.height(10.dp))
+                        Button(onClick = { reloadKey++ }, colors = ButtonDefaults.buttonColors(containerColor = AppAccent)) {
+                            Text("إعادة تحميل المشغّل", color = Color.Black)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Button(
+                            onClick = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(video.playbackUrl ?: video.canonicalPageUrl))) }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AppSurface)
+                        ) { Text("فتح في المتصفح") }
+                    }
+                }
+            }
+        }
+        Column(Modifier.fillMaxWidth().background(AppSurface).padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("المشغّل الرسمي", color = AppAccent, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Button(onClick = { reloadKey++ }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF303943))) {
+                    Text("تحديث المشغّل", color = Color.White)
+                }
+            }
             Text(
-                "المصدر هو الذي يحدد الجودة والترميز داخل المشغّل المضمّن. اختيار AV1 والتحكم الدقيق في الـBuffer غير متاحين لهذا النوع من التشغيل.",
-                color = AppMuted,
-                fontSize = 12.sp,
-                lineHeight = 18.sp
+                "لو الصورة فضلت سوداء، جرّب إعادة التحميل. هذا المصدر لا يتيح رابط بث مباشر مستقلًا للتطبيق؛ لذلك لا يمكن التحكم في ترميزه أو Buffer من هنا.",
+                color = AppMuted, fontSize = 11.sp, lineHeight = 16.sp
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
                         preferences.recordFeedback(video, liked = true)
-                        feedbackMessage = "هنحسّن الاقتراحات بناءً على اختيارك"
+                        feedbackMessage = "تم حفظ تفضيلك على الجهاز"
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AppAccent),
                     modifier = Modifier.weight(1f)
@@ -442,36 +537,37 @@ private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, pre
                 Button(
                     onClick = {
                         preferences.recordFeedback(video, liked = false)
-                        feedbackMessage = "هنقلّل اقتراحات المحتوى المشابه"
+                        feedbackMessage = "هنقلّل ظهور المحتوى المشابه"
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF303943)),
                     modifier = Modifier.weight(1f)
                 ) { Text("مش مهتم", color = Color.White) }
             }
             if (feedbackMessage.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(3.dp))
                 Text(feedbackMessage, color = AppMuted, fontSize = 11.sp)
             }
-            if (relatedVideos.isNotEmpty()) {
-                Spacer(Modifier.height(12.dp))
-                Text("فيديوهات مشابهة", color = Color.White, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        }
+        if (relatedVideos.isNotEmpty()) {
+            Column(Modifier.fillMaxWidth().weight(1f).padding(top = 10.dp)) {
+                Text("اختيارات قريبة من الفيديو", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 14.dp))
+                LazyRow(contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(relatedVideos, key = { it.providerId + ":" + it.canonicalId }) { related ->
                         Column(Modifier.width(170.dp).clickable { onOpenRelated(related) }) {
                             if (!related.thumbnailUrl.isNullOrBlank()) {
-                                AsyncImage(
-                                    model = related.thumbnailUrl,
-                                    contentDescription = related.title,
-                                    modifier = Modifier.fillMaxWidth().height(92.dp),
-                                    contentScale = ContentScale.Crop
-                                )
+                                AsyncImage(model = related.thumbnailUrl, contentDescription = related.title, modifier = Modifier.fillMaxWidth().height(92.dp), contentScale = ContentScale.Crop)
+                            } else {
+                                Box(Modifier.fillMaxWidth().height(92.dp).background(Color(0xFF202832)), contentAlignment = Alignment.Center) {
+                                    Text("AV1 MIX", color = AppAccent)
+                                }
                             }
                             Text(related.title, color = Color.White, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
             }
+        } else {
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
