@@ -102,6 +102,12 @@ private fun AV1MixApp() {
     var query by remember { mutableStateOf("") }
     var selectedVideo by remember { mutableStateOf<NormalizedVideo?>(null) }
     var historyVersion by remember { mutableIntStateOf(0) }
+    val privacyPreferences = remember {
+        context.getSharedPreferences("av1mix_privacy", android.content.Context.MODE_PRIVATE)
+    }
+    var ageConfirmed by remember {
+        mutableStateOf(privacyPreferences.getBoolean("age_confirmed", false))
+    }
 
     MaterialTheme(colorScheme = darkColorScheme(
         primary = AppAccent,
@@ -111,7 +117,12 @@ private fun AV1MixApp() {
         onBackground = Color.White,
         onSurface = Color.White
     )) {
-        if (selectedVideo != null) {
+        if (!ageConfirmed) {
+            AgeGateScreen {
+                privacyPreferences.edit().putBoolean("age_confirmed", true).apply()
+                ageConfirmed = true
+            }
+        } else if (selectedVideo != null) {
             BackHandler { selectedVideo = null }
             PlayerScreen(video = selectedVideo!!, registry = registry, onBack = { selectedVideo = null }, onOpenRelated = { related -> history.add(related); historyVersion++; selectedVideo = related })
         } else {
@@ -158,6 +169,40 @@ private fun AV1MixApp() {
                     )
                     MainTab.SETTINGS -> SettingsScreen(Modifier.padding(padding))
                 }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun AgeGateScreen(onConfirm: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(AppBackground).padding(28.dp), contentAlignment = Alignment.Center) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = AppSurface),
+            shape = RoundedCornerShape(24.dp)
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("AV1 MIX", color = AppAccent, fontSize = 26.sp, fontWeight = FontWeight.Black)
+                Spacer(Modifier.height(18.dp))
+                Text("محتوى للبالغين فقط", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "باستخدام التطبيق، تؤكد أنك تبلغ 18 سنة أو أكثر وأن استخدامك للمحتوى مسموح به في مكان إقامتك.",
+                    color = AppMuted,
+                    textAlign = TextAlign.Center,
+                    fontSize = 13.sp,
+                    lineHeight = 20.sp
+                )
+                Spacer(Modifier.height(20.dp))
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppAccent)
+                ) { Text("أنا 18 سنة أو أكثر", color = Color.Black, fontWeight = FontWeight.Bold) }
             }
         }
     }
