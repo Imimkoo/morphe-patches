@@ -172,6 +172,7 @@ private fun FeedScreen(
                 key(refreshKey, site.id) {
                     SiteFeedScanner(
                         site = site,
+                        scanKey = refreshKey,
                         onItems = { found -> items = (items + found).distinctBy { it.pageUrl } },
                         onDone = { scanDone++ }
                     )
