@@ -34,7 +34,8 @@ class SiteRepository {
             for (a in doc.select("a[href]")) {
                 val href = a.absUrl("href").trim()
                 if (!isLikelyVideoPage(site, href)) continue
-                val img = a.selectFirst("img") ?: continue
+                val card = a.parents().firstOrNull { it.select("img").isNotEmpty() && it.select("a[href]").size <= 5 } ?: a.parent()
+                val img = a.selectFirst("img") ?: card?.selectFirst("img") ?: continue
                 val title = sequenceOf(a.attr("title"), a.attr("aria-label"), img.attr("alt"), a.text())
                     .map { it.trim().replace(Regex("\\s+"), " ") }
                     .firstOrNull { it.length >= 4 } ?: continue
@@ -66,7 +67,7 @@ class SiteRepository {
         val path = runCatching { URI(href).path.orEmpty().lowercase() }.getOrDefault("")
         if (listOf("/tag", "/category", "/search", "/user", "/channel", "/login", "/signup", "/playlist").any { path.startsWith(it) }) return false
         return when (site.id) {
-            "xfree" -> path.length > 8 && !path.endsWith(".jpg") && !path.endsWith(".png")
+            "xfree" -> (path == "/video" && runCatching { URI(href).rawQuery.orEmpty().contains("id=") }.getOrDefault(false)) || path.startsWith("/video/")
             "eporner" -> path.contains("/video/") || path.contains("/video-") || path.contains("/hd-porn/") || path.contains("/porn-video/")
             "xhamster" -> path.contains("/videos/")
             else -> false
