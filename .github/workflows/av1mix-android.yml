@@ -1,0 +1,52 @@
+name: AV1 Mix Android Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["ibrahim/av1-multisource-player"]
+    paths:
+      - "av1-multisource-player/**"
+      - ".github/workflows/av1mix-android.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - name: Build debug APK
+        working-directory: av1-multisource-player
+        run: gradle --no-daemon --stacktrace assembleDebug
+      - name: Verify APK and AV1 libraries
+        working-directory: av1-multisource-player
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | tee native-libraries.txt
+          grep -E 'lib/arm64-v8a/.*(avcodec|dav1d|ffmpeg)' native-libraries.txt
+          sha256sum app/build/outputs/apk/debug/app-debug.apk | tee SHA256SUMS.txt
+      - name: Upload APK and reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: av1mix-debug-apk
+          path: |
+            av1-multisource-player/app/build/outputs/apk/debug/app-debug.apk
+            av1-multisource-player/SHA256SUMS.txt
+            av1-multisource-player/native-libraries.txt
+          if-no-files-found: error
+          retention-days: 14
