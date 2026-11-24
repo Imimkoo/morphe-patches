@@ -9,6 +9,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
 import java.net.URI
+import java.math.BigInteger
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class SiteRepository {
@@ -65,7 +67,7 @@ class SiteRepository {
         if (listOf("/tag", "/category", "/search", "/user", "/channel", "/login", "/signup", "/playlist").any { path.startsWith(it) }) return false
         return when (site.id) {
             "xfree" -> path.length > 8 && !path.endsWith(".jpg") && !path.endsWith(".png")
-            "eporner" -> path.contains("/video/") || path.contains("/hd-porn/") || path.contains("/porn-video/")
+            "eporner" -> path.contains("/video/") || path.contains("/video-") || path.contains("/hd-porn/") || path.contains("/porn-video/")
             "xhamster" -> path.contains("/videos/")
             else -> false
         }
@@ -74,6 +76,9 @@ class SiteRepository {
     suspend fun resolve(item: VideoItem): StreamCandidate? = withContext(Dispatchers.IO) {
         try {
             val html = requestText(item.pageUrl, item.pageUrl) ?: return@withContext null
+            if (item.siteId == "eporner") {
+                resolveEporner(item, html)?.let { return@withContext it }
+            }
             val doc = Jsoup.parse(html, item.pageUrl)
             val urls = LinkedHashSet<String>()
             doc.select("video[src], video source[src], source[src], video[data-src]").forEach { el ->
@@ -114,6 +119,67 @@ class SiteRepository {
                 codec = codec, referer = item.pageUrl, siteName = item.siteName
             )
         } catch (_: Exception) { null }
+    }
+
+
+    private fun resolveEporner(item: VideoItem, html: String): StreamCandidate? {
+        return try {
+            val path = URI(item.pageUrl).path.orEmpty()
+            val idMatch = Regex("(?:hd-porn|embed)/([^/]+)|video-([^/]+)").find(path) ?: return null
+            val videoId = idMatch.groupValues[1].ifEmpty { idMatch.groupValues[2] }
+            val hash = Regex("""hash\s*[:=]\s*["']([0-9a-fA-F]{32})""").find(html)?.groupValues?.get(1) ?: return null
+            val encodedHash = hash.chunked(8).joinToString("") { BigInteger(it, 16).toString(36) }
+            val apiUrl = "https://www.eporner.com/xhr/video/" + videoId +
+                "?hash=" + encodedHash + "&device=generic&domain=www.eporner.com&fallback=false"
+            val payload = requestText(apiUrl, item.pageUrl) ?: return null
+            val sources = JSONObject(payload).optJSONObject("sources") ?: return null
+            val hasAv1 = Jsoup.parse(html).getElementsByClass("download-av1").isNotEmpty()
+            val standard = mutableListOf<String>()
+            val av1 = mutableListOf<String>()
+            val hls = mutableListOf<String>()
+            val kinds = sources.keys()
+            while (kinds.hasNext()) {
+                val kind = kinds.next()
+                val formats = sources.optJSONObject(kind) ?: continue
+                val formatKeys = formats.keys()
+                while (formatKeys.hasNext()) {
+                    val format = formats.optJSONObject(formatKeys.next()) ?: continue
+                    val src = format.optString("src")
+                    if (!src.startsWith("https://")) continue
+                    if (kind == "hls") {
+                        hls += src
+                    } else {
+                        standard += src
+                        if (hasAv1 && src.endsWith(".mp4")) av1 += src.removeSuffix(".mp4") + "-av1.mp4"
+                    }
+                }
+            }
+            val workingAv1 = av1.firstOrNull { isReachable(it, item.pageUrl) }
+            if (workingAv1 != null) {
+                return StreamCandidate(workingAv1, "video/mp4", "AV1 variant advertised by Eporner; verify decoder at runtime", item.pageUrl, item.siteName)
+            }
+            val fallback = standard.firstOrNull() ?: hls.firstOrNull() ?: return null
+            StreamCandidate(
+                fallback,
+                if (fallback.contains(".m3u8")) "application/x-mpegURL" else "video/mp4",
+                "Eporner fallback stream; codec must be read from player",
+                item.pageUrl,
+                item.siteName
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun isReachable(url: String, referer: String): Boolean {
+        return try {
+            val request = Request.Builder().url(url).head()
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36")
+                .header("Referer", referer).build()
+            client.newCall(request).execute().use { it.isSuccessful }
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun requestText(url: String, referer: String): String? {
