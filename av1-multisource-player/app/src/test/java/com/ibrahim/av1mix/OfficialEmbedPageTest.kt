@@ -21,6 +21,12 @@ class OfficialEmbedPageTest {
     }
 
     @Test
+    fun wrapperUsesThePlayerOrigin() {
+        assertEquals("https://pornalizer.app/", OfficialEmbedPage.origin("https://pornalizer.app/player/embed/12345/"))
+        assertEquals("https://adultembed.com/", OfficialEmbedPage.origin("https://adultembed.com/player/embed/12345/"))
+    }
+
+    @Test
     fun rejectsNonHttpsAndUntrustedHosts() {
         assertFalse(OfficialEmbedPage.isAllowedPlayerUrl("http://adultembed.com/player/embed/12345/"))
         assertFalse(OfficialEmbedPage.isAllowedPlayerUrl("https://evil.example/player/embed/12345/"))
