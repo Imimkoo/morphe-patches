@@ -54,10 +54,13 @@ jobs:
             exit 1
           }
           VIDEO_ID="$(jq -r '.results[0].id' /tmp/adultembed-search.json)"
-          jq -e '.results[0].embed.url | test("^https://adultembed\\.com/player/embed/")' /tmp/adultembed-search.json >/dev/null || {
-            echo "Official embed URL missing or outside the provider host."
+          [[ "${VIDEO_ID}" =~ ^[0-9]+$ ]] || {
+            echo "Search result did not include a numeric video ID."
             exit 1
           }
+          PLAYER_URL="https://adultembed.com/player/embed/${VIDEO_ID}/"
+          [[ "${PLAYER_URL}" == https://adultembed.com/player/embed/* ]] || exit 1
+          echo "Official player URL pattern validated."
           STATUS_CODE="$(curl --silent --show-error --max-time 25 -w '%{http_code}' \
             "https://adultembed.com/api/v1/videos/${VIDEO_ID}/status" \
             -o /tmp/adultembed-status.json)"
