@@ -1,29 +1,34 @@
-# Multi-source Android video client — foundation branch
+# AV1 Mix — multi-source Android client
 
-This branch begins the product rebuild. The earlier AV1 Mix prototype is retained as historical code, not treated as a production-ready app.
+This branch is the active product rebuild. The earlier scraper prototype is not part of the production path.
 
-## Current state
-- Product/source-admission architecture documented in [PRODUCT_FOUNDATION.md](PRODUCT_FOUNDATION.md).
-- Provider capability and rights-gate contracts added in the app data layer.
-- No external provider is approved or enabled yet.
-- No provider is permitted to bypass DRM, paywalls, authentication, geo/access controls, or use undocumented scraping.
-- The old site-page scraper and stream guessing code are legacy prototype code and must not be used as the production provider layer.
+## Implemented in this branch
+- Arabic RTL Compose application shell with home, search, player, settings and local watch history.
+- Provider-neutral catalog contracts and an admission registry with capability checks, failure isolation and cancellation-safe coroutine handling.
+- AdultEmbed v1 adapter using documented JSON search, related and availability endpoints.
+- Official AdultEmbed player URLs only; the app does not extract or download media files.
+- Local watch history stored on-device and clearable by the user.
+- Fixture tests for provider admission, API mapping, URL validation and status checks.
+- Legacy site scraper, DOM scanner and guessed stream resolver removed from the active app source.
 
-## Why the rebuild is necessary
-The previous prototype attempted to parse pages from multiple sites and infer stream URLs. That approach is fragile and cannot establish playback rights or actual codec availability. The new design uses documented provider interfaces and explicit playback capabilities.
+## Source and playback capability
+The first connected catalog is AdultEmbed. Its public v1 documentation explicitly describes app integrations and its official embedded player. The app preserves that player and its ads.
 
-## Playback strategy
-- Official embed: provider-hosted player in a restricted WebView, only after mobile embed permission is confirmed.
-- Authorized direct stream: Media3/ExoPlayer.
-- External-only: open the provider's page.
-- Unavailable: no play action.
-- AV1 is selected only when the source offers it; the actual codec and decoder must be verified at runtime.
-- Offline downloads remain disabled unless expressly allowed by the provider.
+This source currently provides:
+- Search and related recommendations.
+- Arabic metadata where available.
+- A hosted official player.
+- Availability checks.
 
-## Build
-Open this directory in Android Studio with JDK 17+ and Android SDK 36, then run `:app:assembleDebug`.
+This source does **not** provide app-level AV1 selection, Media3 playback, precise buffer control, or offline downloads. The UI says so rather than pretending those features work. A future provider can be added only when its documented contract supports the needed capability.
 
-The existing GitHub Actions workflow is configured to build this branch and check the APK's bundled AV1 libraries. A successful build does not establish that playback works on the target OPPO device.
+The provider's public claims about content approval, rights and 18+ provenance are not an independent audit. See [PROVIDER_REVIEW.md](PROVIDER_REVIEW.md).
 
-## Next milestone
-Implement and test the provider-neutral UI shell and adapter contract suite. A provider remains disabled until its terms, content provenance/moderation process, takedown behavior, and Android playback permission are confirmed.
+## Build and verification
+The project targets Android ARM64, JDK 17 and Android SDK 36. GitHub Actions runs unit tests, assembles a debug APK, verifies the signature and checks the bundled AV1 decoder libraries. A successful CI build is not a substitute for playback testing on the target OPPO device.
+
+## Security boundaries
+- No HTML scraping, hidden/private endpoint calls, guessed media URLs, DRM bypass or access-control circumvention.
+- No download or re-hosting unless a provider expressly permits it.
+- Official embeds are not modified and provider advertising is not removed.
+- Watch history is local to the device.
