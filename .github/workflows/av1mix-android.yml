@@ -43,16 +43,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --max-time 25 \
+          SEARCH_CODE="$(curl --silent --show-error --max-time 25 -w '%{http_code}' \
             "https://adultembed.com/api/v1/search?per_page=1&quality=complete&lang=ar&sort=popular" \
-            -o /tmp/adultembed-search.json
-          jq -e '.results | type == "array" and length > 0' /tmp/adultembed-search.json >/dev/null
+            -o /tmp/adultembed-search.json)"
+          echo "AdultEmbed search HTTP: ${SEARCH_CODE}"
+          test "${SEARCH_CODE}" = "200"
+          echo "Search JSON keys: $(jq -r 'keys | join(",")' /tmp/adultembed-search.json)"
+          jq -e '.results | type == "array" and length > 0' /tmp/adultembed-search.json >/dev/null || {
+            echo "Search results array missing or empty."
+            exit 1
+          }
           VIDEO_ID="$(jq -r '.results[0].id' /tmp/adultembed-search.json)"
-          jq -e '.results[0].embed.url | test("^https://adultembed\\.com/player/embed/")' /tmp/adultembed-search.json >/dev/null
-          curl --fail --silent --show-error --max-time 25 \
+          jq -e '.results[0].embed.url | test("^https://adultembed\\.com/player/embed/")' /tmp/adultembed-search.json >/dev/null || {
+            echo "Official embed URL missing or outside the provider host."
+            exit 1
+          }
+          STATUS_CODE="$(curl --silent --show-error --max-time 25 -w '%{http_code}' \
             "https://adultembed.com/api/v1/videos/${VIDEO_ID}/status" \
-            -o /tmp/adultembed-status.json
-          jq -e '(.active // .playable // (.status == "active")) == true' /tmp/adultembed-status.json >/dev/null
+            -o /tmp/adultembed-status.json)"
+          echo "AdultEmbed status HTTP: ${STATUS_CODE}"
+          test "${STATUS_CODE}" = "200"
+          echo "Status response: $(jq -c '{active, playable, status}' /tmp/adultembed-status.json)"
+          jq -e '(.active // .playable // (.status == "active")) == true' /tmp/adultembed-status.json >/dev/null || {
+            echo "Video status did not confirm active/playable."
+            exit 1
+          }
           echo "AdultEmbed search, official-player URL, and availability checks passed."
       - name: Run unit tests
         working-directory: av1-multisource-player
