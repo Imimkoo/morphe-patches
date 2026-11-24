@@ -65,6 +65,14 @@ class AdultEmbedProviderTest {
     }
 
     @Test
+    fun preservesThePlayerHostReturnedByTheProvider() = runBlocking {
+        val source = provider(
+            """{"results":[{"id":12345,"title":"Fixture","embed":{"url":"https://pornalizer.app/player/embed/12345/"}}]}"""
+        )
+        assertEquals("https://pornalizer.app/player/embed/12345/", source.search("", 1).single().playbackUrl)
+    }
+
+    @Test
     fun providerDoesNotClaimDirectStreamOfflineOrCodecControl() {
         val source = provider("""{"results":[]}""")
         assertEquals(PlaybackKind.OFFICIAL_EMBED, source.capabilities.playbackKind)
