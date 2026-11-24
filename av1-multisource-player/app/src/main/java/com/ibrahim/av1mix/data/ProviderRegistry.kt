@@ -35,6 +35,26 @@ class ProviderRegistry(providers: Collection<VideoCatalogProvider>) {
                 .distinctBy { "${it.providerId}:${it.canonicalId}" }
         }
 
+    suspend fun discover(): List<NormalizedVideo> =
+        supervisorScope {
+            admittedProviders
+                .filter { it.capabilities.supportsSearch }
+                .map { provider ->
+                    async {
+                        try {
+                            provider.discover()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            emptyList()
+                        }
+                    }
+                }
+                .awaitAll()
+                .flatten()
+                .distinctBy { "${it.providerId}:${it.canonicalId}" }
+        }
+
     suspend fun related(video: NormalizedVideo): List<NormalizedVideo> {
         val provider = admittedProviders.firstOrNull {
             it.providerId == video.providerId && it.capabilities.supportsRelated
