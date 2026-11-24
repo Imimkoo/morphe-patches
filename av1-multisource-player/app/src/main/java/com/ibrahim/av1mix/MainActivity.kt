@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -108,7 +110,7 @@ private fun AV1MixApp() {
     )) {
         if (selectedVideo != null) {
             BackHandler { selectedVideo = null }
-            PlayerScreen(video = selectedVideo!!, onBack = { selectedVideo = null })
+            PlayerScreen(video = selectedVideo!!, registry = registry, onBack = { selectedVideo = null }, onOpenRelated = { related -> history.add(related); historyVersion++; selectedVideo = related })
         } else {
             Scaffold(
                 containerColor = AppBackground,
@@ -308,7 +310,11 @@ private fun VideoCard(video: NormalizedVideo, onClick: () -> Unit) {
 }
 
 @Composable
-private fun PlayerScreen(video: NormalizedVideo, onBack: () -> Unit) {
+private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, onBack: () -> Unit, onOpenRelated: (NormalizedVideo) -> Unit) {
+    var relatedVideos by remember(video.providerId, video.canonicalId) { mutableStateOf<List<NormalizedVideo>>(emptyList()) }
+    LaunchedEffect(video.providerId, video.canonicalId) {
+        relatedVideos = runCatching { registry.related(video) }.getOrDefault(emptyList())
+    }
     Column(Modifier.fillMaxSize().background(AppBackground)) {
         Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = AppSurface)) { Text("رجوع") }
@@ -343,6 +349,26 @@ private fun PlayerScreen(video: NormalizedVideo, onBack: () -> Unit) {
                 fontSize = 12.sp,
                 lineHeight = 18.sp
             )
+            if (relatedVideos.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Text("فيديوهات مشابهة", color = Color.White, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(relatedVideos, key = { it.providerId + ":" + it.canonicalId }) { related ->
+                        Column(Modifier.width(170.dp).clickable { onOpenRelated(related) }) {
+                            if (!related.thumbnailUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = related.thumbnailUrl,
+                                    contentDescription = related.title,
+                                    modifier = Modifier.fillMaxWidth().height(92.dp),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                            Text(related.title, color = Color.White, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
         }
     }
 }
