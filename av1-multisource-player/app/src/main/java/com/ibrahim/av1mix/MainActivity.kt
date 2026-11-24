@@ -259,7 +259,7 @@ private fun HomeScreen(
 
     Column(modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { PageHeader("اكتشاف موحّد · مشغّل واحد") }
+            Column(Modifier.weight(1f)) { PageHeader("مقترحاتك · تتطور مع اختياراتك") }
             Button(onClick = { refresh++ }, colors = ButtonDefaults.buttonColors(containerColor = AppAccent)) {
                 Text("تحديث", color = Color.Black)
             }
@@ -618,14 +618,14 @@ private fun SettingsScreen(preferences: LocalPreferenceStore, modifier: Modifier
             SettingsCard("المصادر", "يتم استخدام واجهة البحث ومشغّل AdultEmbed الرسمي. لا يتم استخراج روابط الفيديو أو تجاوز مشغلات المواقع.")
             SettingsCard("AV1 والجودة", "هذا المصدر يشغّل الفيديو داخل مشغّله الرسمي؛ اختيار الترميز والجودة يخضع للمصدر ولا يمكن فرض AV1 من التطبيق.")
             SettingsCard("التخزين المؤقت", "المشغّل الرسمي يدير التخزين المؤقت داخليًا. التحكم المتقدم في Buffer والتنزيل الدائم غير متاحين لهذا المصدر.")
-            SettingsCard("التوصيات", "يتعلم التطبيق من تقييمك للفيديوهات ويرفع أو يخفض أوزان الوسوم والأشخاص محليًا على الجهاز.")
+            SettingsCard("التوصيات", "تتأثر الاقتراحات بإعجاباتك، وعدم اهتمامك، ومدة بقائك على صفحة الفيديو. إشارات المدة تقريبية لأن المشغّل الرسمي لا يرسل حالة التشغيل للتطبيق.")
             Button(
                 onClick = { preferences.clear() },
                 colors = ButtonDefaults.buttonColors(containerColor = AppSurface),
                 modifier = Modifier.fillMaxWidth()
             ) { Text("مسح تفضيلات التوصيات") }
             SettingsCard("الخصوصية", "سجل المشاهدة وتفضيلات التوصيات محفوظان محليًا على الجهاز.")
-            SettingsCard("إصدار التطبيق", "0.2.0-alpha01")
+            SettingsCard("إصدار التطبيق", "0.3.0")
         }
     }
 }
