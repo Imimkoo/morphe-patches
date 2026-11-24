@@ -1,6 +1,9 @@
 package com.ibrahim.av1mix
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
@@ -39,6 +42,8 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.ibrahim.av1mix.data.FeedMode
+import com.ibrahim.av1mix.data.SiteCatalog
+import com.ibrahim.av1mix.data.SiteFeedScanner
 import com.ibrahim.av1mix.data.SiteRepository
 import com.ibrahim.av1mix.data.StreamCandidate
 import com.ibrahim.av1mix.data.VideoItem
@@ -79,7 +84,18 @@ private fun AV1MixApp() {
             }
             selected != null && useWebFallback -> {
                 BackHandler { selected = null; useWebFallback = false }
-                SiteWebFallback(selected!!) { selected = null; useWebFallback = false }
+                SiteWebFallback(
+                    item = selected!!,
+                    onBack = { selected = null; useWebFallback = false },
+                    onStreamFound = { url, _, _ ->
+                        val current = selected
+                        if (current != null && stream == null && url.startsWith("https://")) {
+                            val mime = if (url.contains(".m3u8")) "application/x-mpegURL" else "video/mp4"
+                            stream = StreamCandidate(url, mime, "Codec pending actual player inspection", current.pageUrl, current.siteName)
+                            useWebFallback = false
+                        }
+                    }
+                )
             }
             else -> FeedScreen(mode, repository, { mode = it }, { item ->
                 selected = item
@@ -106,9 +122,12 @@ private fun FeedScreen(
     var items by remember(mode) { mutableStateOf<List<VideoItem>>(emptyList()) }
     var loading by remember(mode) { mutableStateOf(true) }
     var refreshKey by remember { mutableIntStateOf(0) }
+    var scanDone by remember(mode) { mutableIntStateOf(0) }
+    val sites = remember(mode) { SiteCatalog.sites.filter { it.mode == mode } }
 
     LaunchedEffect(mode, refreshKey) {
         loading = true
+        scanDone = 0
         items = withContext(Dispatchers.IO) { repository.loadFeed(mode) }
         loading = false
     }
@@ -136,9 +155,9 @@ private fun FeedScreen(
             }
             items.isEmpty() -> Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("لسه موصلات المواقع محتاجة ضبط", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(if (scanDone < sites.size) "بنقرأ المصادر من المتصفح..." else "المصادر لم ترجع فيديوهات", color = Color.White, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
-                    Text("المواقع بتغيّر طريقة عرض الفيديوهات باستمرار. لو اتغير تركيب موقع هنحدّث موصله بدل ما نخمن روابط الفيديو.", color = Muted, fontSize = 13.sp)
+                    Text("بنستخدم فحص الصفحة داخل WebView للمواقع اللي بتمنع جلب الصفحات العادي.", color = Muted, fontSize = 13.sp)
                     Spacer(Modifier.height(16.dp))
                     Button(onClick = { refreshKey++ }, colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.Black)) { Text("إعادة المحاولة") }
                 }
@@ -148,6 +167,17 @@ private fun FeedScreen(
             }
         }
         if (resolving) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Accent)
+        if (!loading && scanDone < sites.size) {
+            sites.forEach { site ->
+                key(refreshKey, site.id) {
+                    SiteFeedScanner(
+                        site = site,
+                        onItems = { found -> items = (items + found).distinctBy { it.pageUrl } },
+                        onDone = { scanDone++ }
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -242,18 +272,52 @@ private fun PlayerScreen(item: VideoItem, stream: StreamCandidate, onBack: () ->
 }
 
 @Composable
-private fun SiteWebFallback(item: VideoItem, onBack: () -> Unit) {
+private fun SiteWebFallback(
+    item: VideoItem,
+    onBack: () -> Unit,
+    onStreamFound: (String, Int, Int) -> Unit
+) {
     Column(Modifier.fillMaxSize().background(AppBg)) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White) }
-            Text(item.siteName + " · تشغيل الموقع الأصلي", color = Color.White, fontWeight = FontWeight.SemiBold)
+            Text(item.siteName + " · اكتشاف مصدر الفيديو", color = Color.White, fontWeight = FontWeight.SemiBold)
         }
         AndroidView(Modifier.fillMaxSize(), factory = { ctx ->
             WebView(ctx).apply {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.mediaPlaybackRequiresUserGesture = false
-                webViewClient = WebViewClient()
+                addJavascriptInterface(object {
+                    @JavascriptInterface
+                    fun onVideoSource(url: String, width: Int, height: Int) {
+                        if (url.startsWith("https://") && !url.startsWith("blob:")) {
+                            Handler(Looper.getMainLooper()).post { onStreamFound(url, width, height) }
+                        }
+                    }
+                }, "AV1MixBridge")
+                webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView, url: String) {
+                        val script = """
+                            (function() {
+                              const scan = function() {
+                                const v = document.querySelector('video');
+                                if (!v) return;
+                                const src = v.currentSrc || v.src || (v.querySelector('source') && v.querySelector('source').src);
+                                if (!src || !/^https?:/.test(src) || src === window.__av1mixLastSource) return;
+                                window.__av1mixLastSource = src;
+                                if (window.AV1MixBridge) window.AV1MixBridge.onVideoSource(src, v.videoWidth || 0, v.videoHeight || 0);
+                              };
+                              document.addEventListener('loadedmetadata', scan, true);
+                              document.addEventListener('canplay', scan, true);
+                              new MutationObserver(scan).observe(document.documentElement, {subtree:true, childList:true, attributes:true});
+                              let n = 0;
+                              const timer = setInterval(function(){ scan(); if (++n > 30) clearInterval(timer); }, 1000);
+                              scan();
+                            })();
+                        """.trimIndent()
+                        view.evaluateJavascript(script, null)
+                    }
+                }
                 loadUrl(item.pageUrl)
             }
         })
