@@ -16,7 +16,7 @@ android {
     }
     buildTypes {
         release { isMinifyEnabled = false }
-        debug { applicationIdSuffix = ".debug" }
+        debug { applicationIdSuffix = ".next" }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
