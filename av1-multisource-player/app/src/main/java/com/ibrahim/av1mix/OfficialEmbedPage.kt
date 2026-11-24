@@ -45,7 +45,7 @@ internal object OfficialEmbedPage {
     fun isAllowedPlayerUrl(value: String): Boolean {
         val uri = runCatching { URI(value) }.getOrNull() ?: return false
         return uri.scheme.equals("https", ignoreCase = true) &&
-            uri.host.equals("adultembed.com", ignoreCase = true) &&
+            uri.host.lowercase() in setOf("adultembed.com", "pornalizer.app") &&
             uri.userInfo == null &&
             uri.path.matches(Regex("^/player/embed/[0-9]+/$"))
     }
