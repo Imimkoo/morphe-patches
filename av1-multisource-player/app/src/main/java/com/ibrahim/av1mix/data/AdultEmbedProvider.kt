@@ -150,7 +150,7 @@ class AdultEmbedProvider(
 
     private fun isOfficialPlayerUrl(value: String, id: String): Boolean {
         val parsed = runCatching { value.toHttpUrl() }.getOrNull() ?: return false
-        val segments = parsed.pathSegments
+        val segments = parsed.pathSegments.filter { it.isNotEmpty() }
         return parsed.isHttps &&
             parsed.host in setOf("adultembed.com", "pornalizer.app") &&
             segments.size == 3 &&
