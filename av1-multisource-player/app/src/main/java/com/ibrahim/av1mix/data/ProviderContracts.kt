@@ -59,6 +59,7 @@ interface VideoCatalogProvider {
     val approval: ProviderApproval
 
     suspend fun search(query: String, page: Int): List<NormalizedVideo>
+    suspend fun discover(): List<NormalizedVideo> = search("", 1)
     suspend fun related(canonicalId: String): List<NormalizedVideo>
     suspend fun isAvailable(canonicalId: String): Boolean
 }
