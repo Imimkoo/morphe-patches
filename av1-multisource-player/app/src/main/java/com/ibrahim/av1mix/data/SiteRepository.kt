@@ -181,8 +181,9 @@ class SiteRepository {
             "Referer" to referer
         )
         return try {
-            val head = Request.Builder().url(url).head().headers(okhttp3.Headers.headersOf(*headers.flatMap { listOf(it.key, it.value) }.toTypedArray())).build()
-            val headOk = client.newCall(head).execute().use { it.isSuccessful }
+            val headBuilder = Request.Builder().url(url).head()
+            headers.forEach { (key, value) -> headBuilder.header(key, value) }
+            val headOk = client.newCall(headBuilder.build()).execute().use { it.isSuccessful }
             if (headOk) true else {
                 val ranged = Request.Builder().url(url).get()
                     .header("User-Agent", headers.getValue("User-Agent"))
