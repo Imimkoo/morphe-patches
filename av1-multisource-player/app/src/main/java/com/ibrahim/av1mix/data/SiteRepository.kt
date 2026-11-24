@@ -293,12 +293,17 @@ class SiteRepository {
 
     private fun nextXHamsterByte(algorithm: Int, state: IntArray): Int {
         var s = state[0]
-        s = when (algorithm) {
-            1 -> s * 1664525 + 1013904223
+        val output: Int
+        when (algorithm) {
+            1 -> {
+                s = s * 1664525 + 1013904223
+                output = s
+            }
             2 -> {
                 s = s xor (s shl 13)
                 s = s xor (s ushr 17)
-                s xor (s shl 5)
+                s = s xor (s shl 5)
+                output = s
             }
             3 -> {
                 s += 0x9e3779b9.toInt()
@@ -306,37 +311,41 @@ class SiteRepository {
                 s *= 0x85ebca77.toInt()
                 s = s xor (s ushr 13)
                 s *= 0xc2b2ae3d.toInt()
-                s xor (s ushr 16)
+                s = s xor (s ushr 16)
+                output = s
             }
             4 -> {
                 s += 0x6d2b79f5
                 s = Integer.rotateLeft(s, 7)
                 s += 0x9e3779b9.toInt()
                 s = s xor (s ushr 11)
-                s * 0x27d4eb2d
+                s *= 0x27d4eb2d
+                output = s
             }
             5 -> {
                 s = s xor (s shl 7)
                 s = s xor (s ushr 9)
                 s = s xor (s shl 8)
-                s + 0xa5a5a5a5.toInt()
+                s += 0xa5a5a5a5.toInt()
+                output = s
             }
             6 -> {
                 s = s * 0x2c9277b5 + 0xac564b05.toInt()
                 val mixed = s xor (s ushr 18)
-                mixed ushr ((s ushr 27) and 31)
+                val shift = (s ushr 27) and 31
+                output = mixed ushr shift
             }
             7 -> {
                 s += 0x9e3779b9.toInt()
                 var e = s xor (s shl 5)
                 e *= 0x7feb352d
                 e = e xor (e ushr 15)
-                e * 0x846ca68b.toInt()
+                output = e * 0x846ca68b.toInt()
             }
             else -> return 0
         }
         state[0] = s
-        return s and 0xff
+        return output and 0xff
     }
 
     private fun requestText(url: String, referer: String): String? {
