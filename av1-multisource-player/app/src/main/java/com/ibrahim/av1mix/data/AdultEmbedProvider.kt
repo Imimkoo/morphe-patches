@@ -4,6 +4,9 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -44,13 +47,24 @@ class AdultEmbedProvider(
     )
 
     override suspend fun search(query: String, page: Int): List<NormalizedVideo> =
+        fetchSearch(query, page, if (query.isBlank()) "popular" else "newest")
+
+    override suspend fun discover(): List<NormalizedVideo> = coroutineScope {
+        listOf("popular", "newest", "longest")
+            .map { sort -> async { fetchSearch("", 1, sort) } }
+            .awaitAll()
+            .flatten()
+            .distinctBy { it.canonicalId }
+    }
+
+    private suspend fun fetchSearch(query: String, page: Int, sort: String): List<NormalizedVideo> =
         withContext(Dispatchers.IO) {
             val builder = endpoint("search").newBuilder()
                 .addQueryParameter("page", page.coerceAtLeast(1).toString())
                 .addQueryParameter("per_page", "24")
                 .addQueryParameter("quality", "complete")
                 .addQueryParameter("lang", "ar")
-                .addQueryParameter("sort", if (query.isBlank()) "popular" else "newest")
+                .addQueryParameter("sort", sort)
             if (query.isNotBlank()) builder.addQueryParameter("query", query.trim().take(120))
             parseResults(getJson(builder.build().toString()).getAsJsonArray("results"))
         }
