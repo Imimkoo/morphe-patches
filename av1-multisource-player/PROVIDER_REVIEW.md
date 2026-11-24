@@ -13,7 +13,7 @@ This review distinguishes provider-published integration permission from indepen
 
 The current public v1 documentation establishes:
 - It is intended for integrations described as websites, apps and bots.
-- Search results include an official `embed.url`; the player URL is hosted at `adultembed.com/player/embed/{id}/`.
+- Search results include an `embed.url`; current live API output returned `https://pornalizer.app/player/embed/{id}/`, while the published docs illustrate `adultembed.com/player/embed/{id}/`. The adapter preserves the API-returned URL only for the two exact HTTPS player hosts and never constructs a different host.
 - Search supports Arabic metadata and returns a `results` collection.
 - Related-video and per-video status endpoints exist.
 - Removed videos are exposed through the API; videos that stop being playable are removed from normal endpoints.
@@ -22,15 +22,15 @@ The current public v1 documentation establishes:
 
 The adapter intentionally:
 - Calls only the documented v1 JSON API.
-- Accepts playback URLs only when the HTTPS host is `adultembed.com` and the path is the official player path.
-- Falls back only to the documented permanent player URL for the returned video ID.
+- Accepts only API-returned HTTPS URLs on the exact `adultembed.com` or `pornalizer.app` hosts and the exact `/player/embed/{numeric-id}/` path.
+- Falls back only to the documented permanent player URL for the returned video ID if the API omits an embed URL.
 - Never downloads or extracts the underlying media file.
 - Does not claim AV1, quality, offline, or buffer control. Those remain under the embedded player's control.
 - Keeps watch history on-device.
 
 ## Remaining validation
 
-- Runtime API response and Android WebView playback must pass device tests; public documentation alone does not prove runtime compatibility on every device.
+- CI verifies the live API result and that the exact returned player page responds with a non-empty HTML document. Real playback and sound still require testing on the target OPPO device; HTTP 200 does not prove a video stream starts.
 - The provider's statements about rights, performer age, and source approval are not an independent audit. Any credible report or removal signal must suppress the item.
 - Player cookies, analytics, referrer behavior, and ad technology need privacy inspection.
 - Fullscreen, PiP, and background playback are not claimed until verified.
