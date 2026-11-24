@@ -152,7 +152,7 @@ class AdultEmbedProvider(
         val parsed = runCatching { value.toHttpUrl() }.getOrNull() ?: return false
         val segments = parsed.pathSegments
         return parsed.isHttps &&
-            parsed.host == "adultembed.com" &&
+            parsed.host in setOf("adultembed.com", "pornalizer.app") &&
             segments.size == 3 &&
             segments[0] == "player" &&
             segments[1] == "embed" &&
