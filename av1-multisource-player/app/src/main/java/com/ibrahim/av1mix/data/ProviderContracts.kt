@@ -45,6 +45,8 @@ data class NormalizedVideo(
     val performerIds: List<String>,
     val studioId: String?,
     val updatedAtEpochSeconds: Long?,
+    /** Official provider player URL; never a guessed or scraped media-file URL. */
+    val playbackUrl: String? = null,
 )
 
 /**
