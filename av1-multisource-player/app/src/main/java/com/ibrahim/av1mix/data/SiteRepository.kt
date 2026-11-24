@@ -293,50 +293,56 @@ class SiteRepository {
 
     private fun nextXHamsterByte(algorithm: Int, state: IntArray): Int {
         var s = state[0]
+        var nextState = s
         val output: Int
         when (algorithm) {
             1 -> {
                 s = s * 1664525 + 1013904223
+                nextState = s
                 output = s
             }
             2 -> {
                 s = s xor (s shl 13)
                 s = s xor (s ushr 17)
                 s = s xor (s shl 5)
+                nextState = s
                 output = s
             }
             3 -> {
                 s += 0x9e3779b9.toInt()
+                nextState = s
                 s = s xor (s ushr 16)
                 s *= 0x85ebca77.toInt()
                 s = s xor (s ushr 13)
                 s *= 0xc2b2ae3d.toInt()
-                s = s xor (s ushr 16)
-                output = s
+                output = s xor (s ushr 16)
             }
             4 -> {
                 s += 0x6d2b79f5
+                nextState = s
                 s = Integer.rotateLeft(s, 7)
                 s += 0x9e3779b9.toInt()
                 s = s xor (s ushr 11)
-                s *= 0x27d4eb2d
-                output = s
+                output = s * 0x27d4eb2d
             }
             5 -> {
                 s = s xor (s shl 7)
                 s = s xor (s ushr 9)
                 s = s xor (s shl 8)
                 s += 0xa5a5a5a5.toInt()
+                nextState = s
                 output = s
             }
             6 -> {
                 s = s * 0x2c9277b5 + 0xac564b05.toInt()
+                nextState = s
                 val mixed = s xor (s ushr 18)
                 val shift = (s ushr 27) and 31
                 output = mixed ushr shift
             }
             7 -> {
                 s += 0x9e3779b9.toInt()
+                nextState = s
                 var e = s xor (s shl 5)
                 e *= 0x7feb352d
                 e = e xor (e ushr 15)
@@ -344,7 +350,7 @@ class SiteRepository {
             }
             else -> return 0
         }
-        state[0] = s
+        state[0] = nextState
         return output and 0xff
     }
 
