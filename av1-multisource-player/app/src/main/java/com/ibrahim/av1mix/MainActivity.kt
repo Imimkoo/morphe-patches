@@ -46,6 +46,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -64,6 +65,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.ibrahim.av1mix.data.AdultEmbedProvider
@@ -311,9 +314,22 @@ private fun VideoCard(video: NormalizedVideo, onClick: () -> Unit) {
 
 @Composable
 private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, onBack: () -> Unit, onOpenRelated: (NormalizedVideo) -> Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var playerWebView by remember(video.providerId, video.canonicalId) { mutableStateOf<WebView?>(null) }
     var relatedVideos by remember(video.providerId, video.canonicalId) { mutableStateOf<List<NormalizedVideo>>(emptyList()) }
     LaunchedEffect(video.providerId, video.canonicalId) {
         relatedVideos = runCatching { registry.related(video) }.getOrDefault(emptyList())
+    }
+    DisposableEffect(lifecycleOwner, playerWebView) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> playerWebView?.onPause()
+                Lifecycle.Event.ON_RESUME -> playerWebView?.onResume()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     Column(Modifier.fillMaxSize().background(AppBackground)) {
         Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -336,8 +352,21 @@ private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, onB
                     settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                     webViewClient = WebViewClient()
                     webChromeClient = WebChromeClient()
-                    loadUrl(video.playbackUrl ?: video.canonicalPageUrl)
+                }.also { playerWebView = it }
+            },
+            update = { view ->
+                val target = video.playbackUrl ?: video.canonicalPageUrl
+                if (view.tag != target) {
+                    view.tag = target
+                    view.loadUrl(target)
                 }
+            },
+            onRelease = { view ->
+                view.stopLoading()
+                view.onPause()
+                view.removeAllViews()
+                view.destroy()
+                if (playerWebView === view) playerWebView = null
             }
         )
         Column(Modifier.fillMaxWidth().background(AppSurface).padding(14.dp)) {
