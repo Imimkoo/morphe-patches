@@ -39,6 +39,21 @@ jobs:
         run: |
           yes | sdkmanager --licenses >/dev/null
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - name: Smoke-test AdultEmbed public API
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 25 \
+            "https://adultembed.com/api/v1/search?per_page=1&quality=complete&lang=ar&sort=popular" \
+            -o /tmp/adultembed-search.json
+          jq -e '.results | type == "array" and length > 0' /tmp/adultembed-search.json >/dev/null
+          VIDEO_ID="$(jq -r '.results[0].id' /tmp/adultembed-search.json)"
+          jq -e '.results[0].embed.url | test("^https://adultembed\\.com/player/embed/")' /tmp/adultembed-search.json >/dev/null
+          curl --fail --silent --show-error --max-time 25 \
+            "https://adultembed.com/api/v1/videos/${VIDEO_ID}/status" \
+            -o /tmp/adultembed-status.json
+          jq -e '(.active // .playable // (.status == "active")) == true' /tmp/adultembed-status.json >/dev/null
+          echo "AdultEmbed search, official-player URL, and availability checks passed."
       - name: Run unit tests
         working-directory: av1-multisource-player
         run: gradle --no-daemon --stacktrace testDebugUnitTest
