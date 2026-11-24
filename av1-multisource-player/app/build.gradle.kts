@@ -35,7 +35,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview:1.9.4")
     implementation("androidx.compose.foundation:foundation:1.9.4")
     implementation("androidx.compose.material3:material3:1.4.0")
-    implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    implementation("androidx.compose.material:material-icons-extended:1.9.4")
     implementation("androidx.media3:media3-exoplayer:$media3")
     implementation("androidx.media3:media3-exoplayer-hls:$media3")
     implementation("androidx.media3:media3-exoplayer-dash:$media3")
