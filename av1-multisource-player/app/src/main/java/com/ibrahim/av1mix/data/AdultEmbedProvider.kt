@@ -136,10 +136,13 @@ class AdultEmbedProvider(
 
     private fun isOfficialPlayerUrl(value: String, id: String): Boolean {
         val parsed = runCatching { value.toHttpUrl() }.getOrNull() ?: return false
+        val segments = parsed.pathSegments
         return parsed.isHttps &&
             parsed.host == "adultembed.com" &&
-            parsed.encodedPath.startsWith("/player/embed/") &&
-            parsed.encodedPath.contains(id)
+            segments.size == 3 &&
+            segments[0] == "player" &&
+            segments[1] == "embed" &&
+            segments[2] == id
     }
 
     private fun endpoint(path: String) =
