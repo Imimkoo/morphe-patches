@@ -72,7 +72,7 @@ fun SiteFeedScanner(site: SourceSite, scanKey: Int, onItems: (List<VideoItem>) -
                                   ? p === '/video' && u.searchParams.has('id')
                                   : sid === 'eporner'
                                     ? p.includes('/hd-porn/') || p.includes('/embed/') || p.includes('/video-')
-                                    : p.includes('/videos/');
+                                    : (p.includes('/videos/') || p.includes('/shorts/'));
                                 if (!ok || seen.has(u.href)) continue;
                                 const box = a.closest('article') || a.closest('[class*="video"]') || a.parentElement;
                                 const img = a.querySelector('img') || (box && box.querySelector('img'));
