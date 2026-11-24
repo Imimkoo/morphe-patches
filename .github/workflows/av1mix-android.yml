@@ -31,10 +31,23 @@ jobs:
         with:
           gradle-version: "8.13"
       - name: Restore stable debug signing key
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/.android/debug.keystore
-          key: av1mix-debug-keystore-v1
+          key: av1mix-debug-keystore-v2
+      - name: Create debug signing key when no cached key exists
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [[ ! -s "$HOME/.android/debug.keystore" ]]; then
+            keytool -genkeypair -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android -keypass android \
+              -alias androiddebugkey -keyalg RSA -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          chmod 600 "$HOME/.android/debug.keystore"
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses >/dev/null
@@ -109,6 +122,12 @@ jobs:
           strings /tmp/av1mix-libavcodec.so | grep -q 'dav1d AV1 decoder by VideoLAN'
           strings /tmp/av1mix-libavcodec.so | grep -q 'enable-decoder=libdav1d'
           sha256sum "$APK" | tee SHA256SUMS.txt
+      - name: Save stable debug signing key
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: av1mix-debug-keystore-v2
       - name: Upload APK and reports
         uses: actions/upload-artifact@v4
         with:
