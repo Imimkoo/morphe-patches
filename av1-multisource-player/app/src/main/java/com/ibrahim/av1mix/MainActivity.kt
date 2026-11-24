@@ -80,7 +80,12 @@ private fun AV1MixApp() {
         when {
             selected != null && stream != null -> {
                 BackHandler { selected = null; stream = null; useWebFallback = false }
-                PlayerScreen(selected!!, stream!!) { selected = null; stream = null; useWebFallback = false }
+                PlayerScreen(
+                    item = selected!!,
+                    stream = stream!!,
+                    onBack = { selected = null; stream = null; useWebFallback = false },
+                    onOpenOriginal = { stream = null; useWebFallback = true }
+                )
             }
             selected != null && useWebFallback -> {
                 BackHandler { selected = null; useWebFallback = false }
@@ -207,7 +212,7 @@ private fun VideoCard(item: VideoItem, onClick: () -> Unit) {
 }
 
 @Composable
-private fun PlayerScreen(item: VideoItem, stream: StreamCandidate, onBack: () -> Unit) {
+private fun PlayerScreen(item: VideoItem, stream: StreamCandidate, onBack: () -> Unit, onOpenOriginal: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var decoderName by remember { mutableStateOf("جاري تحديد المفكك...") }
@@ -267,7 +272,11 @@ private fun PlayerScreen(item: VideoItem, stream: StreamCandidate, onBack: () ->
             Text("Codec: $codecName", color = Color.White, fontSize = 12.sp)
             Text("Decoder: $decoderName", color = Color.White, fontSize = 12.sp)
             Text("Source: " + stream.siteName, color = Muted, fontSize = 11.sp)
-            playbackError?.let { Text("Playback error: $it", color = Color(0xFFFF8A80), fontSize = 11.sp) }
+            playbackError?.let {
+                Text("Playback error: $it", color = Color(0xFFFF8A80), fontSize = 11.sp)
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = onOpenOriginal) { Text("جرّب مشغل الموقع الأصلي") }
+            }
         }
     }
 }
