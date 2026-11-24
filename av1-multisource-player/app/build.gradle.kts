@@ -14,9 +14,20 @@ android {
         versionName = "0.3.0"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
+    signingConfigs {
+        create("stableDebug") {
+            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
     buildTypes {
         release { isMinifyEnabled = false }
-        debug { applicationIdSuffix = ".next" }
+        debug {
+            applicationIdSuffix = ".next"
+            signingConfig = signingConfigs.getByName("stableDebug")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
