@@ -5,8 +5,10 @@ import android.os.Looper
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
@@ -16,10 +18,10 @@ import java.net.URI
 import java.util.concurrent.atomic.AtomicBoolean
 
 @Composable
-fun SiteFeedScanner(site: SourceSite, onItems: (List<VideoItem>) -> Unit, onDone: () -> Unit) {
-    val finished = AtomicBoolean(false)
+fun SiteFeedScanner(site: SourceSite, scanKey: Int, onItems: (List<VideoItem>) -> Unit, onDone: () -> Unit) {
+    val finished = remember(site.id, scanKey) { AtomicBoolean(false) }
     AndroidView(
-        modifier = Modifier.size(1.dp).alpha(0f),
+        modifier = Modifier.fillMaxWidth().height(1.dp).alpha(0f),
         factory = { ctx ->
             WebView(ctx).apply {
                 settings.javaScriptEnabled = true
