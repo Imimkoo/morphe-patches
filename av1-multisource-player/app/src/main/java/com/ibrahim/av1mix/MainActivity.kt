@@ -1,337 +1,260 @@
 package com.ibrahim.av1mix
 
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.webkit.JavascriptInterface
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.media3.common.Format
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.DecoderReuseEvaluation
-import androidx.media3.exoplayer.analytics.AnalyticsListener
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
-import coil.compose.AsyncImage
-import com.ibrahim.av1mix.data.FeedMode
-import com.ibrahim.av1mix.data.SiteCatalog
-import com.ibrahim.av1mix.data.SiteFeedScanner
-import com.ibrahim.av1mix.data.SiteRepository
-import com.ibrahim.av1mix.data.StreamCandidate
-import com.ibrahim.av1mix.data.VideoItem
-import com.ibrahim.av1mix.player.Av1PlayerFactory
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
-private val AppBg = Color(0xFF090B0E)
-private val Panel = Color(0xFF15191F)
-private val Accent = Color(0xFFB7F36B)
-private val Muted = Color(0xFF9BA4AE)
+private val AppBackground = Color(0xFF090C10)
+private val AppSurface = Color(0xFF151B22)
+private val AppAccent = Color(0xFFB8F078)
+private val AppMuted = Color(0xFFA0AAB5)
+
+private enum class MainTab { HOME, SEARCH, HISTORY, SETTINGS }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = android.graphics.Color.rgb(9, 11, 14)
-        window.navigationBarColor = android.graphics.Color.rgb(9, 11, 14)
+        window.statusBarColor = android.graphics.Color.rgb(9, 12, 16)
+        window.navigationBarColor = android.graphics.Color.rgb(9, 12, 16)
         setContent { AV1MixApp() }
     }
 }
 
 @Composable
 private fun AV1MixApp() {
-    val repository = remember { SiteRepository() }
-    var mode by remember { mutableStateOf(FeedMode.SHORT) }
-    var selected by remember { mutableStateOf<VideoItem?>(null) }
-    var stream by remember { mutableStateOf<StreamCandidate?>(null) }
-    var resolving by remember { mutableStateOf(false) }
-    var useWebFallback by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    var tab by rememberSaveable { mutableStateOf(MainTab.HOME) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var refreshCount by remember { mutableIntStateOf(0) }
 
-    MaterialTheme(colorScheme = darkColorScheme(background = AppBg, surface = Panel, primary = Accent, onBackground = Color.White, onSurface = Color.White)) {
-        when {
-            selected != null && stream != null -> {
-                BackHandler { selected = null; stream = null; useWebFallback = false }
-                PlayerScreen(
-                    item = selected!!,
-                    stream = stream!!,
-                    onBack = { selected = null; stream = null; useWebFallback = false },
-                    onOpenOriginal = { stream = null; useWebFallback = true }
-                )
-            }
-            selected != null && useWebFallback -> {
-                BackHandler { selected = null; useWebFallback = false }
-                SiteWebFallback(
-                    item = selected!!,
-                    onBack = { selected = null; useWebFallback = false },
-                    onStreamFound = { url, _, _ ->
-                        val current = selected
-                        if (current != null && stream == null && url.startsWith("https://")) {
-                            val mime = if (url.contains(".m3u8")) "application/x-mpegURL" else "video/mp4"
-                            stream = StreamCandidate(url, mime, "Codec pending actual player inspection", current.pageUrl, current.siteName)
-                            useWebFallback = false
-                        }
-                    }
-                )
-            }
-            else -> FeedScreen(mode, repository, { mode = it }, { item ->
-                selected = item
-                resolving = true
-                scope.launch {
-                    val resolved = repository.resolve(item)
-                    stream = resolved
-                    resolving = false
-                    if (resolved == null) useWebFallback = true
-                }
-            }, resolving)
-        }
-    }
-}
-
-@Composable
-private fun FeedScreen(
-    mode: FeedMode,
-    repository: SiteRepository,
-    onModeChange: (FeedMode) -> Unit,
-    onOpen: (VideoItem) -> Unit,
-    resolving: Boolean
-) {
-    var items by remember(mode) { mutableStateOf<List<VideoItem>>(emptyList()) }
-    var loading by remember(mode) { mutableStateOf(true) }
-    var refreshKey by remember { mutableIntStateOf(0) }
-    var scanDone by remember(mode) { mutableIntStateOf(0) }
-    val sites = remember(mode) { SiteCatalog.sites.filter { it.mode == mode } }
-
-    LaunchedEffect(mode, refreshKey) {
-        loading = true
-        scanDone = 0
-        items = withContext(Dispatchers.IO) { repository.loadFeed(mode) }
-        loading = false
-    }
-
-    Column(Modifier.fillMaxSize().background(AppBg)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("AV1 MIX", color = Accent, fontSize = 22.sp, fontWeight = FontWeight.Black, letterSpacing = 1.4.sp)
-                Text("مصادر متعددة · مشغل واحد", color = Muted, fontSize = 12.sp)
-            }
-            IconButton(onClick = { refreshKey++ }) { Icon(Icons.Default.Refresh, contentDescription = "تحديث", tint = Color.White) }
-        }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ModeChip("فيديوهات بالطول", mode == FeedMode.SHORT) { onModeChange(FeedMode.SHORT) }
-            ModeChip("فيديوهات طويلة", mode == FeedMode.LONG) { onModeChange(FeedMode.LONG) }
-        }
-        Spacer(Modifier.height(12.dp))
-        when {
-            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = Accent)
-                    Spacer(Modifier.height(12.dp))
-                    Text("بنبحث في المصادر...", color = Muted)
-                }
-            }
-            items.isEmpty() -> Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (scanDone < sites.size) "بنقرأ المصادر من المتصفح..." else "المصادر لم ترجع فيديوهات", color = Color.White, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    Text("بنستخدم فحص الصفحة داخل WebView للمواقع اللي بتمنع جلب الصفحات العادي.", color = Muted, fontSize = 13.sp)
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = { refreshKey++ }, colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.Black)) { Text("إعادة المحاولة") }
-                }
-            }
-            else -> LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(items, key = { it.id }) { item -> VideoCard(item) { onOpen(item) } }
-            }
-        }
-        if (resolving) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Accent)
-        if (!loading && scanDone < sites.size) {
-            sites.forEach { site ->
-                key(refreshKey, site.id) {
-                    SiteFeedScanner(
-                        site = site,
-                        scanKey = refreshKey,
-                        onItems = { found -> items = (items + found).distinctBy { it.pageUrl } },
-                        onDone = { scanDone++ }
+    MaterialTheme(colorScheme = darkColorScheme(
+        primary = AppAccent,
+        background = AppBackground,
+        surface = AppSurface,
+        onPrimary = Color(0xFF10150A),
+        onBackground = Color.White,
+        onSurface = Color.White
+    )) {
+        Scaffold(
+            containerColor = AppBackground,
+            bottomBar = {
+                NavigationBar(containerColor = AppSurface) {
+                    NavigationBarItem(
+                        selected = tab == MainTab.HOME,
+                        onClick = { tab = MainTab.HOME },
+                        icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                        label = { Text("الرئيسية") }
+                    )
+                    NavigationBarItem(
+                        selected = tab == MainTab.SEARCH,
+                        onClick = { tab = MainTab.SEARCH },
+                        icon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        label = { Text("بحث") }
+                    )
+                    NavigationBarItem(
+                        selected = tab == MainTab.HISTORY,
+                        onClick = { tab = MainTab.HISTORY },
+                        icon = { Icon(Icons.Default.History, contentDescription = null) },
+                        label = { Text("السجل") }
+                    )
+                    NavigationBarItem(
+                        selected = tab == MainTab.SETTINGS,
+                        onClick = { tab = MainTab.SETTINGS },
+                        icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                        label = { Text("الإعدادات") }
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun ModeChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(color = if (selected) Accent else Panel, shape = RoundedCornerShape(50), modifier = Modifier.clickable(onClick = onClick)) {
-        Text(label, Modifier.padding(horizontal = 18.dp, vertical = 10.dp), color = if (selected) Color.Black else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-    }
-}
-
-@Composable
-private fun VideoCard(item: VideoItem, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Panel).clickable(onClick = onClick)) {
-        Box(Modifier.fillMaxWidth().height(if (item.mode == FeedMode.SHORT) 300.dp else 205.dp).background(Color(0xFF20262E))) {
-            if (!item.thumbnailUrl.isNullOrBlank()) AsyncImage(model = item.thumbnailUrl, contentDescription = item.title, modifier = Modifier.fillMaxSize())
-            Surface(color = Color(0xCC090B0E), shape = RoundedCornerShape(6.dp), modifier = Modifier.align(Alignment.BottomStart).padding(10.dp)) {
-                Text(item.siteName, color = Accent, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
-            }
-        }
-        Column(Modifier.padding(12.dp)) {
-            Text(item.title, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(5.dp))
-            Text(item.codecEvidence, color = Muted, fontSize = 11.sp)
-        }
-    }
-}
-
-@OptIn(UnstableApi::class)
-@Composable
-private fun PlayerScreen(item: VideoItem, stream: StreamCandidate, onBack: () -> Unit, onOpenOriginal: () -> Unit) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    var decoderName by remember { mutableStateOf("جاري تحديد المفكك...") }
-    var codecName by remember { mutableStateOf(stream.codec) }
-    var playbackError by remember { mutableStateOf<String?>(null) }
-    val player = remember(stream.url) { Av1PlayerFactory.create(context, stream) }
-
-    DisposableEffect(player) {
-        val listener = object : Player.Listener {
-            override fun onPlayerError(error: PlaybackException) {
-                playbackError = error.errorCodeName + ": " + (error.message ?: "playback error")
-            }
-        }
-        val analytics = object : AnalyticsListener {
-            override fun onVideoInputFormatChanged(eventTime: AnalyticsListener.EventTime, format: Format, decoderReuseEvaluation: DecoderReuseEvaluation?) {
-                codecName = (format.sampleMimeType ?: "unknown") + " · " + (format.codecs ?: "codec details unavailable")
-            }
-            override fun onVideoDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderNameValue: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
-                decoderName = decoderNameValue
-            }
-        }
-        player.addListener(listener)
-        player.addAnalyticsListener(analytics)
-        onDispose {
-            player.removeListener(listener)
-            player.removeAnalyticsListener(analytics)
-            player.release()
-        }
-    }
-    DisposableEffect(lifecycleOwner, player) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE) player.pause()
-            if (event == Lifecycle.Event.ON_RESUME) player.play()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    Column(Modifier.fillMaxSize().background(AppBg)) {
-        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White) }
-            Column(Modifier.weight(1f)) {
-                Text(item.siteName, color = Accent, fontWeight = FontWeight.Bold)
-                Text(item.title, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp)
-            }
-        }
-        AndroidView(modifier = Modifier.fillMaxWidth().weight(1f), factory = { ctx ->
-            PlayerView(ctx).apply {
-                this.player = player
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                useController = true
-                setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-            }
-        }, update = { it.player = player })
-        Column(Modifier.fillMaxWidth().background(Panel).padding(14.dp)) {
-            Text("معلومات التشغيل", color = Accent, fontWeight = FontWeight.Bold)
-            Text("Codec: $codecName", color = Color.White, fontSize = 12.sp)
-            Text("Decoder: $decoderName", color = Color.White, fontSize = 12.sp)
-            Text("Source: " + stream.siteName, color = Muted, fontSize = 11.sp)
-            playbackError?.let {
-                Text("Playback error: $it", color = Color(0xFFFF8A80), fontSize = 11.sp)
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onOpenOriginal) { Text("جرّب مشغل الموقع الأصلي") }
+        ) { padding ->
+            when (tab) {
+                MainTab.HOME -> HomeScreen(refreshCount, Modifier.padding(padding)) { refreshCount++ }
+                MainTab.SEARCH -> SearchScreen(query, { query = it }, Modifier.padding(padding))
+                MainTab.HISTORY -> HistoryScreen(Modifier.padding(padding))
+                MainTab.SETTINGS -> SettingsScreen(Modifier.padding(padding))
             }
         }
     }
 }
 
 @Composable
-private fun SiteWebFallback(
-    item: VideoItem,
-    onBack: () -> Unit,
-    onStreamFound: (String, Int, Int) -> Unit
-) {
-    Column(Modifier.fillMaxSize().background(AppBg)) {
-        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White) }
-            Text(item.siteName + " · اكتشاف مصدر الفيديو", color = Color.White, fontWeight = FontWeight.SemiBold)
-        }
-        AndroidView(modifier = Modifier.fillMaxSize(), factory = { ctx ->
-            WebView(ctx).apply {
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = true
-                settings.mediaPlaybackRequiresUserGesture = false
-                addJavascriptInterface(object {
-                    @JavascriptInterface
-                    fun onVideoSource(url: String, width: Int, height: Int) {
-                        if (url.startsWith("https://") && !url.startsWith("blob:")) {
-                            Handler(Looper.getMainLooper()).post { onStreamFound(url, width, height) }
+private fun PageHeader(subtitle: String) {
+    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 18.dp)) {
+        Text("AV1 MIX", color = AppAccent, fontSize = 25.sp, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp)
+        Text(subtitle, color = AppMuted, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun HomeScreen(refreshCount: Int, modifier: Modifier = Modifier, onRefresh: () -> Unit) {
+    Column(modifier.fillMaxSize()) {
+        PageHeader("اكتشاف موحّد · مشغّل واحد")
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 18.dp, end = 18.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = AppSurface),
+                    shape = RoundedCornerShape(22.dp)
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(color = Color(0xFF263322), shape = RoundedCornerShape(18.dp), modifier = Modifier.size(58.dp)) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Shield, contentDescription = null, tint = AppAccent, modifier = Modifier.size(30.dp))
+                            }
                         }
-                    }
-                }, "AV1MixBridge")
-                webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView, url: String) {
-                        val script = """
-                            (function() {
-                              const scan = function() {
-                                const v = document.querySelector('video');
-                                if (!v) return;
-                                const src = v.currentSrc || v.src || (v.querySelector('source') && v.querySelector('source').src);
-                                if (!src || !/^https?:/.test(src) || src === window.__av1mixLastSource) return;
-                                window.__av1mixLastSource = src;
-                                if (window.AV1MixBridge) window.AV1MixBridge.onVideoSource(src, v.videoWidth || 0, v.videoHeight || 0);
-                              };
-                              document.addEventListener('loadedmetadata', scan, true);
-                              document.addEventListener('canplay', scan, true);
-                              new MutationObserver(scan).observe(document.documentElement, {subtree:true, childList:true, attributes:true});
-                              let n = 0;
-                              const timer = setInterval(function(){ scan(); if (++n > 30) clearInterval(timer); }, 1000);
-                              scan();
-                            })();
-                        """.trimIndent()
-                        view.evaluateJavascript(script, null)
+                        Spacer(Modifier.height(16.dp))
+                        Text("مكتبتك الموحدة", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "مكان واحد للبحث والاكتشاف والمشاهدة عبر المصادر المتصلة.",
+                            color = AppMuted, fontSize = 13.sp, textAlign = TextAlign.Center
+                        )
                     }
                 }
-                loadUrl(item.pageUrl)
             }
-        })
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = AppSurface), shape = RoundedCornerShape(22.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                        Text("المصادر", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "لا يوجد حاليًا مصدر متصل اجتاز مراجعة شروط الاستخدام وحقوق التشغيل. لن نعرض نتائج وهمية أو نستخرج روابط تشغيل غير مصرح بها.",
+                            color = AppMuted, fontSize = 13.sp, lineHeight = 20.sp
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Button(
+                            onClick = onRefresh,
+                            colors = ButtonDefaults.buttonColors(containerColor = AppAccent),
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("إعادة فحص المصادر", fontWeight = FontWeight.Bold) }
+                        if (refreshCount > 0) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("آخر فحص محلي: $refreshCount", color = AppMuted, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+            item {
+                Text("ماذا سيعمل عند توصيل المصادر؟", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                FeatureLine("بحث موحّد", "نتائج من أكثر من مصدر في قائمة واحدة")
+                FeatureLine("توصيات ذكية", "اقتراحات تتعلم من المشاهدة والتخطي")
+                FeatureLine("مشغّل واحد", "معرفة الترميز والمفكك المستخدمين فعليًا")
+                FeatureLine("تخزين ذكي", "ذاكرة مؤقتة منفصلة عن التنزيلات الدائمة")
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeatureLine(title: String, description: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(7.dp).background(AppAccent, RoundedCornerShape(50)))
+        Column(Modifier.padding(start = 12.dp)) {
+            Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(description, color = AppMuted, fontSize = 12.sp)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchScreen(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxSize()) {
+        PageHeader("ابحث عبر المكتبة كلها")
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            label = { Text("اكتب كلمة البحث") },
+            singleLine = true
+        )
+        Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) {
+            Text(
+                if (query.isBlank()) "اكتب ما تريد البحث عنه." else "البحث جاهز، لكنه ينتظر توصيل مصدر معتمد.",
+                color = AppMuted, textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun HistoryScreen(modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxSize()) {
+        PageHeader("سجل المشاهدة")
+        Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) {
+            Text("لا توجد مشاهدات مسجلة بعد.", color = AppMuted, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+private fun SettingsScreen(modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxSize()) {
+        PageHeader("إعدادات التشغيل والخصوصية")
+        Column(Modifier.padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsCard("التشغيل", "سيتم إظهار الترميز والمفكك الفعليين بعد تشغيل مصدر متوافق.")
+            SettingsCard("التخزين المؤقت", "سيتم فصل ذاكرة التشغيل عن الاحتفاظ بالمقاطع السابقة والتنزيلات.")
+            SettingsCard("الخصوصية", "التصميم يعتمد على حفظ سجل المشاهدة والتفضيلات محليًا افتراضيًا.")
+            SettingsCard("إصدار التطبيق", "0.2.0 · واجهة المنتج الأساسية")
+        }
+    }
+}
+
+@Composable
+private fun SettingsCard(title: String, description: String) {
+    Card(colors = CardDefaults.cardColors(containerColor = AppSurface), shape = RoundedCornerShape(18.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(title, color = Color.White, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(5.dp))
+            Text(description, color = AppMuted, fontSize = 12.sp, lineHeight = 18.sp)
+        }
     }
 }
