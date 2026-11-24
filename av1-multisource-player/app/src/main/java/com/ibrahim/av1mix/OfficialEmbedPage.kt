@@ -19,7 +19,8 @@ internal object OfficialEmbedPage {
             <html lang="en">
             <head>
               <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-              <meta charset="utf-8">\n              <title>AV1Mix player loading</title>
+              <meta charset="utf-8">
+              <title>AV1Mix player loading</title>
               <style>
                 html, body { margin:0; padding:0; width:100%; height:100%; background:#000; overflow:hidden; }
                 .frame { position:relative; width:100%; height:100%; min-height:100%; background:#000; }
