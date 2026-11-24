@@ -34,6 +34,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.Format
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DecoderReuseEvaluation
@@ -211,6 +212,7 @@ private fun VideoCard(item: VideoItem, onClick: () -> Unit) {
     }
 }
 
+@OptIn(UnstableApi::class)
 @Composable
 private fun PlayerScreen(item: VideoItem, stream: StreamCandidate, onBack: () -> Unit, onOpenOriginal: () -> Unit) {
     val context = LocalContext.current
