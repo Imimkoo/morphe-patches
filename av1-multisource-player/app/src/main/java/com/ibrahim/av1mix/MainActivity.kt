@@ -65,6 +65,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -387,14 +388,21 @@ private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, pre
     var reloadKey by remember(video.providerId, video.canonicalId) { mutableIntStateOf(0) }
     var feedbackMessage by remember(video.providerId, video.canonicalId) { mutableStateOf("") }
     val openedAt = remember(video.providerId, video.canonicalId) { SystemClock.elapsedRealtime() }
+    val playerHost = remember(video.providerId, video.canonicalId) {
+        Uri.parse(video.playbackUrl ?: video.canonicalPageUrl).host
+    }
+    val currentPageLoading by rememberUpdatedState(pageLoading)
+    val currentPlayerError by rememberUpdatedState(playerError)
 
     LaunchedEffect(video.providerId, video.canonicalId) {
         relatedVideos = runCatching { registry.related(video) }.getOrDefault(emptyList())
     }
     DisposableEffect(video.providerId, video.canonicalId) {
         onDispose {
-            val secondsOnScreen = ((SystemClock.elapsedRealtime() - openedAt) / 1000L).coerceAtLeast(0L)
-            preferences.recordDwell(video, secondsOnScreen)
+            if (!currentPageLoading && currentPlayerError == null) {
+                val secondsOnScreen = ((SystemClock.elapsedRealtime() - openedAt) / 1000L).coerceAtLeast(0L)
+                preferences.recordDwell(video, secondsOnScreen)
+            }
         }
     }
     DisposableEffect(lifecycleOwner, playerWebView) {
@@ -443,13 +451,18 @@ private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, pre
                                 pageLoading = false
                             }
                             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                                if (request?.isForMainFrame == true) {
+                                val isPlayerFrame = request?.url?.host == playerHost &&
+                                    request.url.path?.startsWith("/player/embed/") == true
+                                if (request?.isForMainFrame == true || isPlayerFrame) {
                                     pageLoading = false
                                     playerError = "تعذر تحميل صفحة المشغّل (${error?.errorCode ?: "شبكة"})"
                                 }
                             }
                             override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
-                                if (request?.isForMainFrame == true && (errorResponse?.statusCode ?: 200) >= 400) {
+                                val isPlayerFrame = request?.url?.host == playerHost &&
+                                    request.url.path?.startsWith("/player/embed/") == true
+                                if ((request?.isForMainFrame == true || isPlayerFrame) &&
+                                    (errorResponse?.statusCode ?: 200) >= 400) {
                                     pageLoading = false
                                     playerError = "المصدر رجّع خطأ HTTP ${errorResponse?.statusCode}"
                                 }
