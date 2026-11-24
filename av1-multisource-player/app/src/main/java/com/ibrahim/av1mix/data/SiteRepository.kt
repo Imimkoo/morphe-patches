@@ -69,7 +69,7 @@ class SiteRepository {
         return when (site.id) {
             "xfree" -> (path == "/video" && runCatching { URI(href).rawQuery.orEmpty().contains("id=") }.getOrDefault(false)) || path.startsWith("/video/")
             "eporner" -> path.contains("/video/") || path.contains("/video-") || path.contains("/hd-porn/") || path.contains("/porn-video/")
-            "xhamster" -> path.contains("/videos/")
+            "xhamster" -> path.contains("/videos/") || path.contains("/shorts/")
             else -> false
         }
     }
