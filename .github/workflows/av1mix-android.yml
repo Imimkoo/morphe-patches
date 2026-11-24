@@ -41,9 +41,14 @@ jobs:
         working-directory: av1-multisource-player
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
-          unzip -l app/build/outputs/apk/debug/app-debug.apk | tee native-libraries.txt
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          unzip -l "$APK" | tee native-libraries.txt
           grep -E 'lib/arm64-v8a/.*(avcodec|dav1d|ffmpeg)' native-libraries.txt
-          sha256sum app/build/outputs/apk/debug/app-debug.apk | tee SHA256SUMS.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
+          unzip -p "$APK" lib/arm64-v8a/libavcodec.so > /tmp/av1mix-libavcodec.so
+          strings /tmp/av1mix-libavcodec.so | grep -q 'dav1d AV1 decoder by VideoLAN'
+          strings /tmp/av1mix-libavcodec.so | grep -q 'enable-decoder=libdav1d'
+          sha256sum "$APK" | tee SHA256SUMS.txt
       - name: Upload APK and reports
         uses: actions/upload-artifact@v4
         with:
