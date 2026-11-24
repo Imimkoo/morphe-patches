@@ -1,35 +1,29 @@
-# AV1 Mix — Android prototype
+# Multi-source Android video client — foundation branch
 
-A personal multi-source video feed prototype for Android. It has two feeds (short/vertical and long/horizontal), a provider adapter layer, one Media3 player, and a software AV1 path using NextLib's dav1d-backed FFmpeg renderer.
+This branch begins the product rebuild. The earlier AV1 Mix prototype is retained as historical code, not treated as a production-ready app.
 
-## Initial sources
+## Current state
+- Product/source-admission architecture documented in [PRODUCT_FOUNDATION.md](PRODUCT_FOUNDATION.md).
+- Provider capability and rights-gate contracts added in the app data layer.
+- No external provider is approved or enabled yet.
+- No provider is permitted to bypass DRM, paywalls, authentication, geo/access controls, or use undocumented scraping.
+- The old site-page scraper and stream guessing code are legacy prototype code and must not be used as the production provider layer.
 
-| Source | Feed | AV1 status from research |
-|---|---|---|
-| XFree | Short / vertical | Not verified; inspect actual stream at runtime |
-| Eporner | Long | AV1 variants documented for selected videos |
-| XHamster | Long | AV1 variants reported, but current extraction is unstable |
+## Why the rebuild is necessary
+The previous prototype attempted to parse pages from multiple sites and infer stream URLs. That approach is fragile and cannot establish playback rights or actual codec availability. The new design uses documented provider interfaces and explicit playback capabilities.
 
-The parser is conservative: it creates cards only when a likely video-page link and thumbnail are found. It currently handles public progressive MP4 and HLS/DASH URLs exposed in page HTML. If extraction fails, it falls back to the original site in a WebView. It does not bypass DRM, paywalls, authentication, or access controls.
-
-## AV1 playback
-
-- Media3 1.11.1 handles playback.
-- NextLib 1.11.1-0.19.0 provides FFmpeg software renderers with dav1d AV1 decoding.
-- Extension renderers are enabled after Android platform renderers. Platform decoding remains preferred; dav1d is available as a fallback.
-- The player debug panel is intended to report the input format and actual decoder. A bundled library or an AV1 label in a page is not proof of AV1 playback.
+## Playback strategy
+- Official embed: provider-hosted player in a restricted WebView, only after mobile embed permission is confirmed.
+- Authorized direct stream: Media3/ExoPlayer.
+- External-only: open the provider's page.
+- Unavailable: no play action.
+- AV1 is selected only when the source offers it; the actual codec and decoder must be verified at runtime.
+- Offline downloads remain disabled unless expressly allowed by the provider.
 
 ## Build
+Open this directory in Android Studio with JDK 17+ and Android SDK 36, then run `:app:assembleDebug`.
 
-Open this directory in Android Studio with JDK 17+ and Android SDK 36, then run `:app:assembleDebug`. GitHub Actions builds the debug APK and uploads it as an artifact.
+The existing GitHub Actions workflow is configured to build this branch and check the APK's bundled AV1 libraries. A successful build does not establish that playback works on the target OPPO device.
 
-## Prototype limits
-
-- Site layouts change; site-specific selectors/API adapters will be needed after live-device tests.
-- This first milestone has a mixed-source feed and unified player. Auto-play swipe pager and persistent recommendations are next milestones.
-- XFree's actual stream codec is not confirmed.
-- No playback or extraction has yet been tested on the OPPO device. Build success is not runtime success.
-
-## License
-
-NextLib is GPL-3.0. Any distributed build containing it must comply with that license and preserve relevant notices/source availability.
+## Next milestone
+Implement and test the provider-neutral UI shell and adapter contract suite. A provider remains disabled until its terms, content provenance/moderation process, takedown behavior, and Android playback permission are confirmed.
