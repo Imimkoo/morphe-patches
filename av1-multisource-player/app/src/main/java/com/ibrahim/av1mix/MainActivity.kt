@@ -475,7 +475,7 @@ private fun PlayerScreen(video: NormalizedVideo, registry: ProviderRegistry, pre
                         view.tag = fingerprint
                         pageLoading = true
                         playerError = null
-                        view.loadDataWithBaseURL("https://adultembed.com/", OfficialEmbedPage.build(target), "text/html", "UTF-8", null)
+                        view.loadDataWithBaseURL(OfficialEmbedPage.origin(target), OfficialEmbedPage.build(target), "text/html", "UTF-8", null)
                     }
                 },
                 onRelease = { view ->
