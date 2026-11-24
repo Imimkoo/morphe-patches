@@ -25,7 +25,7 @@ object Av1PlayerFactory {
         val trackSelector = DefaultTrackSelector(context).apply {
             parameters = buildUponParameters()
                 .setPreferredVideoMimeTypes(MimeTypes.VIDEO_AV1, MimeTypes.VIDEO_VP9, MimeTypes.VIDEO_H264)
-                .setMaxVideoSize(1280, 720)
+                .setMaxVideoSize(1280, 1280)
                 .build()
         }
         return ExoPlayer.Builder(context)
