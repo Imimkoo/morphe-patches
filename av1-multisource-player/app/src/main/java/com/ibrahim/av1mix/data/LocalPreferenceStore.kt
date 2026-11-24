@@ -31,6 +31,31 @@ class LocalPreferenceStore(context: Context) {
         preferences.edit().putString("weights", gson.toJson(weights)).apply()
     }
 
+    /**
+     * A lightweight implicit signal based on time spent on the detail/player screen.
+     * It is deliberately weaker than an explicit like/dislike because iframe playback
+     * does not expose trustworthy play/pause/progress callbacks to the host app.
+     */
+    @Synchronized
+    fun recordDwell(video: NormalizedVideo, secondsOnScreen: Long) {
+        val delta = when {
+            secondsOnScreen <= 5L -> -1
+            secondsOnScreen >= 45L -> 1
+            else -> 0
+        }
+        if (delta == 0) return
+        val weights = load()
+        video.tags.forEach { tag ->
+            val key = tag.trim().lowercase()
+            if (key.isNotBlank()) weights.tags[key] = ((weights.tags[key] ?: 0) + delta).coerceIn(-20, 20)
+        }
+        video.performerIds.forEach { performer ->
+            val key = performer.trim().lowercase()
+            if (key.isNotBlank()) weights.performers[key] = ((weights.performers[key] ?: 0) + delta).coerceIn(-10, 10)
+        }
+        preferences.edit().putString("weights", gson.toJson(weights)).apply()
+    }
+
     @Synchronized
     fun score(video: NormalizedVideo): Int {
         val weights = load()
