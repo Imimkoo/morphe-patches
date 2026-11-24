@@ -62,8 +62,10 @@ jobs:
           if [[ -z "${PLAYER_URL}" ]]; then
             PLAYER_URL="https://adultembed.com/player/embed/${VIDEO_ID}/"
           fi
-          [[ "${PLAYER_URL}" =~ ^https://adultembed\.com/player/embed/[0-9]+/$ ]] || {
+          PLAYER_PATH="${PLAYER_URL%%\?*}"
+          [[ "${PLAYER_PATH}" =~ ^https://adultembed\\.com/player/embed/[0-9]+/$ ]] || {
             echo "Search result did not contain a valid official player URL."
+            echo "Returned URL host/path: $(python3 -c 'import sys,urllib.parse; u=urllib.parse.urlparse(sys.argv[1]); print(u.scheme, u.netloc, u.path)' "${PLAYER_URL}")"
             exit 1
           }
           PLAYER_CODE="$(curl --location --silent --show-error --max-time 30 -w '%{http_code}' \
