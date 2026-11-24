@@ -71,7 +71,7 @@ fun SiteFeedScanner(site: SourceSite, scanKey: Int, onItems: (List<VideoItem>) -
                                 const ok = sid === 'xfree'
                                   ? p === '/video' && u.searchParams.has('id')
                                   : sid === 'eporner'
-                                    ? /\\/(hd-porn|embed)\\//.test(p) || /\\/video-[^/]+/.test(p)
+                                    ? p.includes('/hd-porn/') || p.includes('/embed/') || p.includes('/video-')
                                     : p.includes('/videos/');
                                 if (!ok || seen.has(u.href)) continue;
                                 const box = a.closest('article') || a.closest('[class*="video"]') || a.parentElement;
