@@ -3,7 +3,7 @@ name: AV1 Mix Android Build
 on:
   workflow_dispatch:
   push:
-    branches: ["ibrahim/av1-multisource-player"]
+    branches: ["ibrahim/av1-multisource-player", "ibrahim/multisource-product-foundation"]
     paths:
       - "av1-multisource-player/**"
       - ".github/workflows/av1mix-android.yml"
