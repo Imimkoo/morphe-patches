@@ -29,7 +29,7 @@ The provider's public claims about content approval, rights and 18+ provenance a
 
 ## Installation note
 
-Version 0.3.0 uses package `com.ibrahim.av1mix.next` so it can be installed alongside the earlier differently signed 0.2 APK without deleting its local history. The workflow now creates and caches a persistent signing key for subsequent 0.3.x updates.
+Version 0.3.0 uses package `com.ibrahim.av1mix.next` so it can be installed alongside the earlier differently signed 0.2 APK without deleting its local history. The workflow now creates and caches a persistent signing key for subsequent 0.3.x updates; CI verifies the APK package ID and version on each build.
 
 ## Build and verification
 The project targets Android ARM64, JDK 17 and Android SDK 36. GitHub Actions runs unit tests, assembles a debug APK, verifies the signature and checks the bundled AV1 decoder libraries. CI now checks the live search, availability endpoint and actual returned player page response, in addition to unit tests, APK assembly and AV1 library verification. A successful HTTP/player-page check is not a substitute for an actual video playback test on the target OPPO device.
