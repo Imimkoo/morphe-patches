@@ -225,7 +225,7 @@ private fun PlayerScreen(item: VideoItem, stream: StreamCandidate, onBack: () ->
         }
         AndroidView(Modifier.fillMaxWidth().weight(1f), factory = { ctx ->
             PlayerView(ctx).apply {
-                player = player
+                this.player = player
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 useController = true
                 setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
