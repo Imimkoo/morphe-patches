@@ -1,38 +1,42 @@
 # Provider candidate review — 2026-11-24
 
-This is a capability and rights review, not a recommendation to publish any provider content.
+This review distinguishes provider-published integration permission from independent verification of the underlying content-rights chain.
 
-| Candidate | What public evidence establishes | Playback boundary | Decision |
+| Candidate | Public evidence | Playback boundary | Decision |
 |---|---|---|---|
-| AdultEmbed | Public API docs describe search, related, taxonomy, Arabic metadata localization, availability/removal checks, changelog sync and an iframe player. | The documented player is hosted by AdultEmbed and shows its own ads. The API browse response does not provide a direct video URL. | Technical candidate for metadata and official embed only. Disabled pending written confirmation of rights, mobile-app use, and moderation/takedown guarantees. |
-| Stash-Box / StashDB | Open-source metadata/indexing API; the self-hosted server starts empty and community metadata is separately maintained. | Metadata/indexing only; not a video stream host. | Potential optional metadata enrichment/deduplication layer. Not a content source. |
-| Unofficial multi-provider scrapers | Community repositories claim to parse multiple sites and expose media URLs. | Usually scraping/undocumented endpoints; stability and permissions are not established. | Rejected for production architecture. No hidden endpoint extraction or access-control circumvention. |
-| Direct site home-page scraping in legacy prototype | Existing prototype uses Jsoup/WebView DOM parsing and guesses likely video URLs. | Breaks when page markup changes; cannot prove source authorization or actual codec. | Legacy only; do not extend. |
+| AdultEmbed API v1 | Its current docs explicitly say v1 supports a tube site, app or bot; it exposes search, related, Arabic metadata, status/removal feeds, and a permanent official player URL. It states only approved/playable videos are returned and its originating providers meet 18 U.S.C. 2257 record-keeping requirements. | Official AdultEmbed player only. The API's embed URL is used; no raw media URL is extracted. Player ads and source controls remain intact. | Enabled narrowly as the first catalog provider, relying on the provider's published API/embed representation. No direct streams, downloads, codec selection, or player modification. Rights/provenance claims remain provider assertions, not an independent audit. |
+| Stash-Box / StashDB | Open-source metadata/indexing API; self-hosted server starts empty and community metadata is separately maintained. | Metadata/indexing only; not a video stream host. | Optional future metadata enrichment/deduplication layer. Not a playback source. |
+| Unofficial multi-provider scrapers | Community repositories claim to parse multiple sites and expose media URLs. | Scraping/undocumented endpoints; stability and permissions are not established. | Rejected for production. No hidden endpoint extraction or access-control circumvention. |
+| Direct site home-page scraping in legacy prototype | Previous prototype used Jsoup/WebView DOM parsing and guessed likely video URLs. | Cannot prove source authorization or actual codec; brittle when markup changes. | Removed from the active application path and not to be restored. |
 
-## AdultEmbed verification details
-Public docs currently claim:
-- Search, related, availability/status, removed-video, trending, taxonomy, and changelog endpoints.
-- Arabic is listed as a supported metadata language.
-- The hosted player is an iframe at adultembed.com/player/embed/{id}/.
-- The player displays AdultEmbed's own ads.
-- Browse metadata does not expose the actual media URL.
-- The docs describe approved/playable catalog entries and a copyright-removal contact process.
+## AdultEmbed integration boundary
 
-Still unverified:
-- Whether its API and player terms expressly authorize a third-party Android app (rather than a conventional website).
-- Whether it has documented rights/authorization from every content owner or a sufficiently reliable licensing basis.
-- Whether its moderation process can guarantee adult-only, consensual, legally sourced content.
-- Whether its player can be used reliably in Android WebView on the target device and whether it permits full-screen, PiP, background, or app-level controls.
-- What user identifiers, cookies, referrer data, analytics, and ad SDKs the player uses.
+The current public v1 documentation establishes:
+- It is intended for integrations described as websites, apps and bots.
+- Search results include an official `embed.url`; the player URL is hosted at `adultembed.com/player/embed/{id}/`.
+- Search supports Arabic metadata and returns a `results` collection.
+- Related-video and per-video status endpoints exist.
+- Removed videos are exposed through the API; videos that stop being playable are removed from normal endpoints.
+- The player displays AdultEmbed's own ads. The app does not hide, replace, or interfere with them.
+- The service states its catalog entries are approved/playable and that originating providers meet 18 U.S.C. 2257 record-keeping requirements.
 
-## Required provider questionnaire
-Before enabling AdultEmbed, obtain written answers to:
-1. May a private Android app display the API metadata and official iframe player?
-2. What contractual permission covers the underlying videos and thumbnails, and what territories/uses are covered?
-3. What age-verification, performer-age, consent, and moderation checks are applied?
-4. How quickly are reported/removed items removed from search, related feeds, caches, and embeds?
-5. What analytics, cookies, identifiers, referrer data, and ad technology does the player use?
-6. Are WebView embedding, fullscreen, picture-in-picture, and external playback supported?
-7. Are there restrictions on local watch history, caching metadata, or app distribution?
+The adapter intentionally:
+- Calls only the documented v1 JSON API.
+- Accepts playback URLs only when the HTTPS host is `adultembed.com` and the path is the official player path.
+- Falls back only to the documented permanent player URL for the returned video ID.
+- Never downloads or extracts the underlying media file.
+- Does not claim AV1, quality, offline, or buffer control. Those remain under the embedded player's control.
+- Keeps watch history on-device.
 
-No provider is enabled until answers are reviewed. A public endpoint, an HTTP 200 response, or a functioning iframe is not a rights grant.
+## Remaining validation
+
+- Runtime API response and Android WebView playback must pass device tests; public documentation alone does not prove runtime compatibility on every device.
+- The provider's statements about rights, performer age, and source approval are not an independent audit. Any credible report or removal signal must suppress the item.
+- Player cookies, analytics, referrer behavior, and ad technology need privacy inspection.
+- Fullscreen, PiP, and background playback are not claimed until verified.
+
+## Rejected implementation patterns
+
+- HTML scraping, hidden/private endpoints, URL guessing, direct media extraction, DRM bypass, ad removal, or player overlays.
+- Treating metadata access as permission to download or re-host a video.
+- Claiming the embedded player can be forced to AV1 or controlled by Media3 when the provider does not expose that capability.
