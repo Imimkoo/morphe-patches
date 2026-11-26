@@ -307,6 +307,15 @@ public class SpoofVideoStreamsPatch {
         }
     }
 
+    /** Shared time targets for the SABR and ExoPlayer buffer adapters. */
+    public static long getVideoBufferTargetMs() {
+        return SabrReadaheadLimit.getConfiguredVideoTargetMs();
+    }
+
+    public static long getVideoBufferResumeMs(long targetMs) {
+        return SabrReadaheadLimit.getConfiguredVideoResumeMs(targetMs);
+    }
+
     /**
      * Injection point.
      * Only invoked when playing a live stream on an Apple client.
