@@ -323,6 +323,28 @@ public class SpoofVideoStreamsPatch {
         return SPOOF_VIDEO_STREAMS;
     }
 
+    /** Starts a new video generation for Ibrahim's shared smart buffer policy. */
+    public static void onPlaybackStarted() {
+        if (SPOOF_VIDEO_STREAMS) {
+            SabrReadaheadLimit.onPlaybackStarted();
+        }
+    }
+
+    /** Supplies the playback clock used to detect seeking and playback stability. */
+    public static void onPlaybackTime(long positionMs) {
+        if (SPOOF_VIDEO_STREAMS) {
+            SabrReadaheadLimit.onPlaybackTime(positionMs);
+        }
+    }
+
+    public static long getVideoBufferTargetMs() {
+        return SabrReadaheadLimit.getConfiguredVideoTargetMs();
+    }
+
+    public static long getVideoBufferResumeMs(long targetMs) {
+        return SabrReadaheadLimit.getConfiguredVideoResumeMs(targetMs);
+    }
+
     /**
      * Injection point.
      * Only invoked when playing a live stream on an Apple client.
