@@ -24,6 +24,7 @@ import app.morphe.patches.youtube.misc.playservice.is_21_11_or_greater
 import app.morphe.patches.youtube.misc.playservice.versionCheckPatch
 import app.morphe.patches.youtube.misc.settings.PreferenceScreen
 import app.morphe.patches.youtube.misc.settings.settingsPatch
+import app.morphe.patches.youtube.video.information.videoInformationPatch
 import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 import app.morphe.patches.youtube.shared.YouTubeActivityOnCreateFingerprint
 
@@ -55,7 +56,8 @@ val spoofVideoStreamsPatch = spoofVideoStreamsPatch(
             sharedExtensionPatch,
             userAgentClientSpoofPatch,
             settingsPatch,
-            versionCheckPatch
+            versionCheckPatch,
+            videoInformationPatch
         )
     },
 
