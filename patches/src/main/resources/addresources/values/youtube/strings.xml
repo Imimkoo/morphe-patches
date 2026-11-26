@@ -1887,6 +1887,8 @@ Video playback with AV1 may stutter or drop frames"</string>
     <string name="morphe_spoof_video_streams_about_720p_max">• Quality may be limited to 720p</string>
     <string name="morphe_spoof_video_streams_player_js_variant_title">Player JavaScript variant</string>
     <string name="morphe_spoof_video_streams_stats_for_nerds_title">Show spoofing in \'Stats for nerds\'</string>
+    <string name="morphe_sabr_video_readahead_tenths_title">SABR video buffer target</string>
+    <string name="morphe_sabr_video_readahead_tenths_summary">Maximum video buffer ahead of playback for SABR clients (0.5–30 seconds). Audio buffering is unchanged.</string>
 
     <!-- misc.fix.videoactionbar.restoreOldVideoActionBarPatch -->
     <string name="morphe_video_action_bar_layout_title">Video action bar layout</string>
