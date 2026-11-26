@@ -1887,11 +1887,11 @@ Video playback with AV1 may stutter or drop frames"</string>
     <string name="morphe_spoof_video_streams_about_720p_max">• Quality may be limited to 720p</string>
     <string name="morphe_spoof_video_streams_player_js_variant_title">Player JavaScript variant</string>
     <string name="morphe_spoof_video_streams_stats_for_nerds_title">Show spoofing in \'Stats for nerds\'</string>
-    <string name="morphe_sabr_video_readahead_tenths_title">SABR video buffer target</string>
-    <string name="morphe_sabr_video_readahead_tenths_summary">Maximum video buffer ahead of playback for SABR clients (0.5–30 seconds). Audio buffering is unchanged.</string>
-    <string name="morphe_sabr_video_readahead_low_tenths_title">SABR low buffer after seeking</string>
-    <string name="morphe_sabr_video_readahead_resume_tenths_title">SABR resume buffer</string>
-    <string name="morphe_sabr_video_readahead_resume_tenths_summary">When buffered video ahead falls to this level, SABR requests refill toward the selected target (0.1–10 seconds).</string>
+    <string name="morphe_sabr_video_readahead_tenths_title">Video buffer target</string>
+    <string name="morphe_sabr_video_readahead_tenths_summary">Maximum video buffer ahead of playback for SABR and ExoPlayer streams (0.5–30 seconds). Audio buffering is unchanged.</string>
+    <string name="morphe_sabr_video_readahead_low_tenths_title">Low buffer after seeking</string>
+    <string name="morphe_sabr_video_readahead_resume_tenths_title">Resume buffer</string>
+    <string name="morphe_sabr_video_readahead_resume_tenths_summary">When buffered video ahead falls to this level, loading resumes toward the selected target (0.1–10 seconds).</string>
     <string name="morphe_sabr_video_readahead_low_tenths_summary">Temporary video buffer target while a seek or rapid timeline jump is detected (0.5–10 seconds).</string>
     <string name="morphe_sabr_video_readahead_stable_seconds_title">Playback stability period</string>
     <string name="morphe_sabr_video_readahead_stable_seconds_summary">Continuous playback time without a detected seek before restoring the stable buffer target (5–300 seconds).</string>
