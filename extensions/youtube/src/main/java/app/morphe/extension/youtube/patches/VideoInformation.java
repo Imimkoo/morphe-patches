@@ -347,6 +347,10 @@ public final class VideoInformation extends BaseVideoInformation {
         SpoofVideoStreamsPatch.onPlaybackTime(positionMs);
     }
 
+    public static boolean isExoPlayerInitialized() {
+        return exoPlayerImplRef != null && exoPlayerImplRef.get() != null;
+    }
+
     /**
      * Injection point.
      *
