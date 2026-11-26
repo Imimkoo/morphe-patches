@@ -28,7 +28,7 @@ import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.patches.BaseVideoInformation;
 import app.morphe.extension.shared.patches.ExoPlayerInterface;
 import app.morphe.extension.shared.patches.components.ContextInterface;
-import app.morphe.extension.youtube.patches.spoof.SpoofVideoStreamsPatch;
+import app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch;
 import app.morphe.extension.youtube.patches.originaltitles.RestoreOriginalTitlesPatch;
 import app.morphe.extension.youtube.patches.playback.speed.RememberPlaybackSpeedPatch;
 import app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch;
