@@ -294,6 +294,19 @@ public class SpoofVideoStreamsPatch {
         return SPOOF_VIDEO_STREAMS;
     }
 
+    /** Playback clock hooks shared by SABR clients, independent of the selected spoof client. */
+    public static void onPlaybackStarted() {
+        if (SPOOF_VIDEO_STREAMS) {
+            SabrReadaheadLimit.onPlaybackStarted();
+        }
+    }
+
+    public static void onPlaybackTime(long positionMs) {
+        if (SPOOF_VIDEO_STREAMS) {
+            SabrReadaheadLimit.onPlaybackTime(positionMs);
+        }
+    }
+
     /**
      * Injection point.
      * Only invoked when playing a live stream on an Apple client.
