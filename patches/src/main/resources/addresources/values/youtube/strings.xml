@@ -2011,21 +2011,26 @@ Limitations:
 • HDR still depends on the spoof video streams client"</string>
     <string name="morphe_video_codec_title">Video codec</string>
     <string name="morphe_video_codec_entry_default">Default</string>
-    <string name="morphe_video_codec_entry_vp9" translatable="false">VP9</string>
+    <string name="morphe_video_codec_entry_av1" translatable="false">AV1 (preferred)</string>
+    <string name="morphe_video_codec_entry_vp9" translatable="false">VP9 fallback</string>
     <string name="morphe_video_codec_entry_avc" translatable="false">AVC (H.264)</string>
     <!-- 'Spoof video streams' should be the same translation used for 'morphe_spoof_video_streams_screen_title'. -->
     <string name="morphe_video_codec_avc_not_available">To force AVC, change \'Spoof video streams\' to \'Android Studio\', \'Android VR\' or \'visionOS\'</string>
-    <string name="morphe_video_codec_user_dialog_message">"VP9
-• Can improve battery life and fix playback stuttering
-• Uses more internet data than AV1
+    <string name="morphe_video_codec_user_dialog_message">"AV1 (preferred)
+• Preferred whenever the selected YouTube response supplies a valid AV1 video stream and Android has an AV1 decoder
+• Software decoding is allowed; playback falls back safely when AV1 is unavailable
 
 AVC (H.264)
-• Requires \'Android Studio\', \'Android VR\', or \'visionOS\' Spoof video stream client
-• Can improve battery life even more
-• Can restore missing video resolutions on older devices
-• Maximum resolution is 1080p
-• HDR videos may not use AVC
-• Some devices cannot force AVC"</string>
+• Optional alternative when supported by the selected spoof client
+• Some devices or streams cannot force AVC"</string>
+    <string name="morphe_sabr_video_readahead_tenths_title">Stable video buffer target</string>
+    <string name="morphe_sabr_video_readahead_tenths_summary">Maximum video buffered ahead of playback through SABR or ExoPlayer (0.5–30 seconds). Audio buffering is not changed.</string>
+    <string name="morphe_sabr_video_readahead_low_tenths_title">Temporary buffer after seeking</string>
+    <string name="morphe_sabr_video_readahead_low_tenths_summary">Lower video buffer target used while a seek or rapid timeline change is detected (0.5–10 seconds).</string>
+    <string name="morphe_sabr_video_readahead_resume_tenths_title">Resume loading threshold</string>
+    <string name="morphe_sabr_video_readahead_resume_tenths_summary">When buffered video ahead falls to this threshold, loading resumes toward the target (0.1–10 seconds).</string>
+    <string name="morphe_sabr_video_readahead_stable_seconds_title">Playback stability duration</string>
+    <string name="morphe_sabr_video_readahead_stable_seconds_summary">Continuous stable playback time required before returning to the normal buffer target (5–300 seconds).</string>
 
     <!-- video.quality.advancedVideoQualityMenuPatch -->
     <string name="morphe_advanced_video_quality_menu_title">Open Advanced quality menu</string>

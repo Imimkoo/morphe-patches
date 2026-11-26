@@ -411,7 +411,7 @@ public class CustomBrandingPatch {
     public static int getDefaultAppNameIndex() {
         return userProvidedCustomName()
                 ? numberOfPresetAppNames()
-                : 1;
+                : 2; // Ibrahim preset.
     }
 
     public static BrandingTheme getDefaultIconStyle() {

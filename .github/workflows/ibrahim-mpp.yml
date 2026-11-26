@@ -1,0 +1,46 @@
+name: Ibrahim MPP build
+
+on:
+  push:
+    branches:
+      - ibrahim/clean-morphe-2.4.0-foundation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Cache Gradle
+        uses: burrunan/gradle-cache-action@v3
+
+      - name: Test
+        timeout-minutes: 30
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew :patches:test :extensions:youtube:testDebugUnitTest :extensions:music:testDebugUnitTest --no-daemon
+
+      - name: Build Android bundle
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew :patches:buildAndroid -PpatchesName="Ibrahim" --no-daemon
+
+      - name: Upload MPP artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: Ibrahim-MPP
+          archive: false
+          path: patches/build/libs
+          if-no-files-found: error
+          retention-days: 30

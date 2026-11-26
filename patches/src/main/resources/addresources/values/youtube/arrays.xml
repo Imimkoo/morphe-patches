@@ -993,12 +993,12 @@
     <!-- video.codecs.disableVideoCodecsPatch -->
     <string-array name="morphe_video_codec_entries">
         <item>@string/morphe_video_codec_entry_default</item>
-        <item>@string/morphe_video_codec_entry_vp9</item>
+        <item>@string/morphe_video_codec_entry_av1</item>
         <item>@string/morphe_video_codec_entry_avc</item>
     </string-array>
     <string-array name="morphe_video_codec_entry_values">
         <item>DEFAULT</item>
-        <item>VP9</item>
+        <item>AV1</item>
         <item>AVC</item>
     </string-array>
 
