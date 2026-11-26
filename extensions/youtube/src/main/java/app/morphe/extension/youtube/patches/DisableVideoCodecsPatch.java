@@ -251,7 +251,8 @@ public class DisableVideoCodecsPatch {
     public static boolean allowCodec(String mimeType) {
         final VideoCodec codec = getVideoCodec();
         final boolean isVideoCodec = mimeType != null && mimeType.regionMatches(true, 0, "video/", 0, 6);
-        final boolean isAv1 = MIMETYPE_VIDEO_AV1.equalsIgnoreCase(mimeType);
+        final boolean isAv1 = mimeType != null
+                && mimeType.toLowerCase(java.util.Locale.ROOT).contains("av01");
 
         // AV1 is exclusive only when the current response offers it. Some spoof clients
         // (including older VR profiles) do not receive AV1 at all; in that case keep the
