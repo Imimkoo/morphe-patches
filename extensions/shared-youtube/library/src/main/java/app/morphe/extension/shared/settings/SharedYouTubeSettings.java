@@ -116,6 +116,8 @@ public class SharedYouTubeSettings extends BaseSettings {
     public static final IntegerSetting SABR_VIDEO_READAHEAD_TENTHS = new IntegerSetting("morphe_sabr_video_readahead_tenths", 30, true, parent(SPOOF_VIDEO_STREAMS));
     /** Lower video target used after seeking or rapid navigation, in tenths of a second. */
     public static final IntegerSetting SABR_VIDEO_READAHEAD_LOW_TENTHS = new IntegerSetting("morphe_sabr_video_readahead_low_tenths", 10, true, parent(SPOOF_VIDEO_STREAMS));
+    /** Low-water mark at which SABR video requests are allowed to refill toward the target. */
+    public static final IntegerSetting SABR_VIDEO_READAHEAD_RESUME_TENTHS = new IntegerSetting("morphe_sabr_video_readahead_resume_tenths", 15, true, parent(SPOOF_VIDEO_STREAMS));
     /** Continuous playback time required before switching from the low to stable target. */
     public static final IntegerSetting SABR_VIDEO_READAHEAD_STABLE_SECONDS = new IntegerSetting("morphe_sabr_video_readahead_stable_seconds", 50, true, parent(SPOOF_VIDEO_STREAMS));
     public static final BooleanSetting SPOOF_VIDEO_STREAMS_STATS_FOR_NERDS = new BooleanSetting("morphe_spoof_video_streams_stats_for_nerds", TRUE, parent(SPOOF_VIDEO_STREAMS));
@@ -175,6 +177,8 @@ public class SharedYouTubeSettings extends BaseSettings {
         SeekBarPreference.register(new SeekBarConfig(SABR_VIDEO_READAHEAD_TENTHS,
                 5, 300, 1, "s", 10));
         SeekBarPreference.register(new SeekBarConfig(SABR_VIDEO_READAHEAD_LOW_TENTHS,
+                5, 100, 1, "s", 10));
+        SeekBarPreference.register(new SeekBarConfig(SABR_VIDEO_READAHEAD_RESUME_TENTHS,
                 5, 100, 1, "s", 10));
         SeekBarPreference.register(new SeekBarConfig(SABR_VIDEO_READAHEAD_STABLE_SECONDS,
                 5, 300, 5, "s"));
