@@ -1588,7 +1588,7 @@ Automotive layout
     <string name="morphe_seekbar_custom_color_invalid">Invalid seekbar color value</string>
 
     <!-- layout.branding.customBrandingPatch -->
-    <string name="morphe_custom_branding_name_entry_2" translatable="false">YouTube Morphe</string>
+    <string name="morphe_custom_branding_name_entry_2" translatable="false">Ibrahim</string>
     <string name="morphe_custom_branding_name_entry_3" translatable="false">YT Morphe</string>
     <string name="morphe_custom_branding_name_entry_4" translatable="false">YT</string>
     <string name="morphe_custom_branding_icon_entry_8">Original analog</string>
@@ -1748,13 +1748,6 @@ Videos are requested by a short prefix of the hashed video ID, so the server can
     <string name="morphe_external_browser_title">Open links in browser</string>
     <string name="morphe_external_browser_summary">Opens links in an external browser instead of the in-app browser</string>
 
-    <!-- video.buffer.playbackBufferPatch -->
-    <string name="morphe_playback_buffer_size_title">Playback buffer size</string>
-    <string name="morphe_playback_buffer_size_entry_default">Default</string>
-    <string name="morphe_playback_buffer_size_entry_low">Low</string>
-    <string name="morphe_playback_buffer_size_entry_medium">Medium</string>
-    <string name="morphe_playback_buffer_size_entry_maximum">Maximum</string>
-
     <!-- video.delay.videoDelayPatch -->
     <string name="morphe_video_delay_title">Video delay</string>
     <string name="morphe_video_delay_summary">Delays the video to keep it in sync with laggy audio, such as Bluetooth headphones (0-5000 ms)</string>
@@ -1841,6 +1834,7 @@ Limitations:
 • HDR still depends on the spoof video streams client"</string>
     <string name="morphe_video_codec_title">Video codec</string>
     <string name="morphe_video_codec_entry_default">Default</string>
+    <string name="morphe_video_codec_entry_av1" translatable="false">AV1 (preferred)</string>
     <string name="morphe_video_codec_entry_vp9" translatable="false">VP9</string>
     <string name="morphe_video_codec_entry_avc" translatable="false">AVC (H.264)</string>
     <!-- 'Spoof video streams' should be the same translation used for 'morphe_spoof_video_streams_screen_title'. -->
@@ -1893,6 +1887,14 @@ Video playback with AV1 may stutter or drop frames"</string>
     <string name="morphe_spoof_video_streams_about_720p_max">• Quality may be limited to 720p</string>
     <string name="morphe_spoof_video_streams_player_js_variant_title">Player JavaScript variant</string>
     <string name="morphe_spoof_video_streams_stats_for_nerds_title">Show spoofing in \'Stats for nerds\'</string>
+    <string name="morphe_sabr_video_readahead_tenths_title">Video buffer target</string>
+    <string name="morphe_sabr_video_readahead_tenths_summary">Maximum video buffer ahead of playback for SABR and ExoPlayer streams (0.5–30 seconds). Audio buffering is unchanged.</string>
+    <string name="morphe_sabr_video_readahead_low_tenths_title">Low buffer after seeking</string>
+    <string name="morphe_sabr_video_readahead_resume_tenths_title">Resume buffer</string>
+    <string name="morphe_sabr_video_readahead_resume_tenths_summary">When buffered video ahead falls to this level, loading resumes toward the selected target (0.1–10 seconds).</string>
+    <string name="morphe_sabr_video_readahead_low_tenths_summary">Temporary video buffer target while a seek or rapid timeline jump is detected (0.5–10 seconds).</string>
+    <string name="morphe_sabr_video_readahead_stable_seconds_title">Playback stability period</string>
+    <string name="morphe_sabr_video_readahead_stable_seconds_summary">Continuous playback time without a detected seek before restoring the stable buffer target (5–300 seconds).</string>
 
     <!-- misc.fix.videoactionbar.restoreOldVideoActionBarPatch -->
     <string name="morphe_video_action_bar_layout_title">Video action bar layout</string>

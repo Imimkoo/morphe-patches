@@ -1598,12 +1598,6 @@ Mistral Nemo هو الخيار الأرخص، بينما توفر Gemma 4 أعل
   <!-- misc.links.openLinksExternallyPatch -->
   <string name="morphe_external_browser_title">فتح الروابط في المتصفح</string>
   <string name="morphe_external_browser_summary">يفتح الروابط في متصفح خارجي بدلًا من المتصفح داخل التطبيق</string>
-  <!-- video.buffer.playbackBufferPatch -->
-  <string name="morphe_playback_buffer_size_title">حجم المخزن المؤقت للتشغيل</string>
-  <string name="morphe_playback_buffer_size_entry_default">الوضع الافتراضي</string>
-  <string name="morphe_playback_buffer_size_entry_low">منخفض</string>
-  <string name="morphe_playback_buffer_size_entry_medium">متوسط</string>
-  <string name="morphe_playback_buffer_size_entry_maximum">الحد الأقصى</string>
   <!-- video.delay.videoDelayPatch -->
   <string name="morphe_video_delay_title">تأخير الفيديو</string>
   <string name="morphe_video_delay_summary">يؤخر الفيديو للحفاظ على تزامنه مع الصوت المتأخر، مثل سماعات البلوتوث (0-5000 جزء الثانية)</string>
@@ -1683,6 +1677,7 @@ Mistral Nemo هو الخيار الأرخص، بينما توفر Gemma 4 أعل
 • يظل تشغيل HDR معتمدًا على عميل Spoof Video Streams"</string>
   <string name="morphe_video_codec_title">ترميز الفيديو</string>
   <string name="morphe_video_codec_entry_default">الافتراضي</string>
+  <string name="morphe_video_codec_entry_av1" translatable="false">AV1 (مفضّل)</string>
   <!-- 'Spoof video streams' should be the same translation used for 'morphe_spoof_video_streams_screen_title'. -->
   <string name="morphe_video_codec_avc_not_available">لفرض استخدام AVC، غيّر \'Spoof Video Streams\' إلى \'Android Studio\' أو \'Android VR\' أو \'visionOS\'</string>
   <string name="morphe_video_codec_user_dialog_message">"VP9
@@ -1729,6 +1724,14 @@ AVC (H.264)
   <string name="morphe_spoof_video_streams_about_720p_max">• قد تكون الجودة محدودة بدقة 720p</string>
   <string name="morphe_spoof_video_streams_player_js_variant_title">متغير JavaScript الخاص بالمشغل</string>
   <string name="morphe_spoof_video_streams_stats_for_nerds_title">عرض التمويه في \'إحصاءات تقنية\'</string>
+  <string name="morphe_sabr_video_readahead_tenths_title">الحد المستهدف لبفر الفيديو</string>
+  <string name="morphe_sabr_video_readahead_tenths_summary">أقصى مدة تحميل للفيديو أمام موضع التشغيل عبر SABR أو ExoPlayer (من 0.5 إلى 30 ثانية). لا يغيّر بفر الصوت.</string>
+  <string name="morphe_sabr_video_readahead_low_tenths_title">البفر المنخفض بعد التنقل</string>
+  <string name="morphe_sabr_video_readahead_resume_tenths_title">حد استئناف تحميل الفيديو</string>
+  <string name="morphe_sabr_video_readahead_resume_tenths_summary">عندما ينخفض الفيديو المحمّل أمام التشغيل إلى هذه القيمة، يستأنف التحميل حتى الهدف المحدد (من 0.1 إلى 10 ثوانٍ).</string>
+  <string name="morphe_sabr_video_readahead_low_tenths_summary">قيمة مؤقتة لبفر الفيديو أثناء اكتشاف التقديم أو الإرجاع (من 0.5 إلى 10 ثوانٍ).</string>
+  <string name="morphe_sabr_video_readahead_stable_seconds_title">مدة استقرار التشغيل</string>
+  <string name="morphe_sabr_video_readahead_stable_seconds_summary">مدة التشغيل المتواصل دون اكتشاف تنقل قبل العودة إلى قيمة البفر المستقرة (من 5 إلى 300 ثانية).</string>
   <!-- misc.fix.videoactionbar.restoreOldVideoActionBarPatch -->
   <string name="morphe_video_action_bar_layout_title">تخطيط شريط إجراءات الفيديو</string>
   <string name="morphe_video_action_bar_layout_entry_1">الافتراضي</string>

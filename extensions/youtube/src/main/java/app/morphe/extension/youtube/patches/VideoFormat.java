@@ -32,6 +32,23 @@ public final class VideoFormat {
      * Injection point.
      */
     public static List<FormatInterface> hookAdaptiveFormats(@Nullable String videoId, @NonNull List<FormatInterface> adaptiveFormats) {
+        boolean hasAv1 = false;
+        for (FormatInterface format : adaptiveFormats) {
+            try {
+                String mimeType = format.patch_getMimeType();
+                if (mimeType != null && mimeType.regionMatches(true, 0, "video/", 0, 6)
+                        && mimeType.toLowerCase(java.util.Locale.ROOT).contains("av01")) {
+                    hasAv1 = true;
+                    break;
+                }
+            } catch (Exception ignored) {
+                // A malformed format entry must not prevent playback of the remaining formats.
+            }
+        }
+        // Update the codec gate for every response/client. A forced AV1 preference is only
+        // exclusive when this particular response contains AV1; otherwise normal fallback works.
+        DisableVideoCodecsPatch.observeAdaptiveFormats(videoId, hasAv1);
+
         return Utils.isNotEmpty(videoId) && !"zzzzzzzzzzz".equals(videoId) && !adaptiveFormats.isEmpty()
                 ? privateHookAdaptiveFormats(videoId, adaptiveFormats)
                 : adaptiveFormats;
