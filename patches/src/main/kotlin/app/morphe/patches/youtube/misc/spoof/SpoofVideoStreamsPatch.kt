@@ -15,6 +15,10 @@ import app.morphe.patches.shared.misc.settings.preference.NonInteractivePreferen
 import app.morphe.patches.shared.misc.settings.preference.PreferenceScreenPreference
 import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
 import app.morphe.patches.shared.misc.spoof.spoofVideoStreamsPatch
+import app.morphe.patches.youtube.layout.player.buttons.addPlayerBottomButton
+import app.morphe.patches.youtube.layout.player.buttons.playerOverlayButtonsHookPatch
+import app.morphe.patches.youtube.video.information.videoInformationPatch
+import app.morphe.patches.youtube.video.buffer.playbackBufferPatch
 import app.morphe.patches.youtube.misc.extension.hooks.YouTubeApplicationInitFingerprint
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
 import app.morphe.patches.youtube.misc.playservice.is_20_31_or_greater
@@ -55,7 +59,10 @@ val spoofVideoStreamsPatch = spoofVideoStreamsPatch(
             sharedExtensionPatch,
             userAgentClientSpoofPatch,
             settingsPatch,
-            versionCheckPatch
+            versionCheckPatch,
+            videoInformationPatch,
+            playbackBufferPatch,
+            playerOverlayButtonsHookPatch
         )
     },
 
@@ -92,8 +99,30 @@ val spoofVideoStreamsPatch = spoofVideoStreamsPatch(
                     SwitchPreference("morphe_spoof_video_streams_player_js_quack", summary = true),
                     ListPreference("morphe_spoof_video_streams_player_js_variant"),
                     SwitchPreference("morphe_spoof_video_streams_stats_for_nerds"),
+                    NonInteractivePreference(
+                        key = "morphe_sabr_video_readahead_tenths",
+                        tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
+                        dependency = "morphe_spoof_video_streams"
+                    ),
+                    NonInteractivePreference(
+                        key = "morphe_sabr_video_readahead_low_tenths",
+                        tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
+                        dependency = "morphe_spoof_video_streams"
+                    ),
+                    NonInteractivePreference(
+                        key = "morphe_sabr_video_readahead_resume_tenths",
+                        tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
+                        dependency = "morphe_spoof_video_streams"
+                    ),
+                    NonInteractivePreference(
+                        key = "morphe_sabr_video_readahead_stable_seconds",
+                        tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
+                        dependency = "morphe_spoof_video_streams"
+                    ),
                 )
             )
         )
+
+        addPlayerBottomButton("Lapp/morphe/extension/youtube/videoplayer/IbrahimVideoControlButton;")
     }
 )
