@@ -63,6 +63,7 @@ public final class IbrahimVideoControlButton {
         final int[] pending = {
                 Settings.SABR_VIDEO_READAHEAD_TENTHS.get(),
                 Settings.SABR_VIDEO_READAHEAD_LOW_TENTHS.get(),
+                Settings.SABR_VIDEO_READAHEAD_RESUME_TENTHS.get(),
                 Settings.SABR_VIDEO_READAHEAD_STABLE_SECONDS.get()
         };
 
@@ -85,7 +86,8 @@ public final class IbrahimVideoControlButton {
 
         addSlider(context, content, "البفر المستقر", pending, 0, 5, 300, 1, true);
         addSlider(context, content, "البفر المنخفض أثناء التقديم والإرجاع", pending, 1, 5, 100, 1, true);
-        addSlider(context, content, "مدة الاستقرار", pending, 2, 5, 300, 5, false);
+        addSlider(context, content, "حد استئناف التحميل", pending, 2, 5, 100, 1, true);
+        addSlider(context, content, "مدة الاستقرار", pending, 3, 5, 300, 5, false);
 
         new AlertDialog.Builder(context)
                 .setTitle("إعدادات إبراهيم للفيديو")
@@ -94,7 +96,8 @@ public final class IbrahimVideoControlButton {
                 .setPositiveButton("حفظ", (dialog, which) -> {
                     Settings.SABR_VIDEO_READAHEAD_TENTHS.save(pending[0]);
                     Settings.SABR_VIDEO_READAHEAD_LOW_TENTHS.save(pending[1]);
-                    Settings.SABR_VIDEO_READAHEAD_STABLE_SECONDS.save(pending[2]);
+                    Settings.SABR_VIDEO_READAHEAD_RESUME_TENTHS.save(pending[2]);
+                    Settings.SABR_VIDEO_READAHEAD_STABLE_SECONDS.save(pending[3]);
                 })
                 .show();
     }
