@@ -47,6 +47,9 @@ public class DisableVideoCodecsPatch {
     @Nullable
     private static volatile VideoCodec videoCodec;
 
+    /** Whether the current player response actually contains an AV1 video format. */
+    private static volatile boolean currentResponseHasAv1;
+
     private static final int[] EMPTY_ARRAY_INT = new int[0];
 
     /**
@@ -221,11 +224,21 @@ public class DisableVideoCodecsPatch {
     }
 
     /**
+     * Called for every player response, independently of the selected spoof client.
+     * The preference must never make a client with no AV1 streams unplayable.
+     */
+    public static void observeAdaptiveFormats(boolean hasAv1) {
+        currentResponseHasAv1 = hasAv1;
+        Logger.printDebug(() -> "Current player response has AV1 video format: " + hasAv1);
+    }
+
+    /**
      * Injection point.
      */
     public static boolean allowVP9() {
         final VideoCodec codec = getVideoCodec();
-        final boolean allowed = codec != VideoCodec.AVC && codec != VideoCodec.AV1;
+        final boolean av1CanBeSelected = codec == VideoCodec.AV1 && currentResponseHasAv1;
+        final boolean allowed = codec != VideoCodec.AVC && !av1CanBeSelected;
         if (!allowed) {
             Logger.printVerbose(() -> "VP9 not allowed");
         }
@@ -240,11 +253,13 @@ public class DisableVideoCodecsPatch {
         final boolean isVideoCodec = mimeType != null && mimeType.regionMatches(true, 0, "video/", 0, 6);
         final boolean isAv1 = MIMETYPE_VIDEO_AV1.equalsIgnoreCase(mimeType);
 
-        // The AV1 preference is exclusive for video tracks. Audio MIME types are unaffected.
-        // This prevents YouTube from silently falling back to VP9 or AVC after AV1 was selected.
+        // AV1 is exclusive only when the current response offers it. Some spoof clients
+        // (including older VR profiles) do not receive AV1 at all; in that case keep the
+        // original formats available instead of returning an empty/unplayable track list.
+        final boolean av1CanBeSelected = codec == VideoCodec.AV1 && currentResponseHasAv1;
         final boolean allowed = !isVideoCodec
                 || switch (codec) {
-                    case AV1 -> isAv1;
+                    case AV1 -> !av1CanBeSelected || isAv1;
                     case VP9, AVC -> !isAv1;
                     case DEFAULT -> true;
                 };
