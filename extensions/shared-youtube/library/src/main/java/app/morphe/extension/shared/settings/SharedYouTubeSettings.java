@@ -168,7 +168,7 @@ public class SharedYouTubeSettings extends BaseSettings {
 
     static {
         SeekBarPreference.register(new SeekBarConfig(SABR_VIDEO_READAHEAD_TENTHS,
-                5, 300, 5, "s", 10));
+                5, 300, 1, "s", 10));
 
         SeekBarPreference.register(new SeekBarConfig(SETTINGS_NEW_INDICATOR_DAYS,
                 0, 14, 1, "", 1, sf("morphe_settings_new_indicator_days_off"), null));
