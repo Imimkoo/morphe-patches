@@ -47,7 +47,7 @@ public final class VideoFormat {
         }
         // Update the codec gate for every response/client. A forced AV1 preference is only
         // exclusive when this particular response contains AV1; otherwise normal fallback works.
-        DisableVideoCodecsPatch.observeAdaptiveFormats(hasAv1);
+        DisableVideoCodecsPatch.observeAdaptiveFormats(videoId, hasAv1);
 
         return Utils.isNotEmpty(videoId) && !"zzzzzzzzzzz".equals(videoId) && !adaptiveFormats.isEmpty()
                 ? privateHookAdaptiveFormats(videoId, adaptiveFormats)
