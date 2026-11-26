@@ -1847,6 +1847,7 @@ Mistral Nemo هو الخيار الأرخص، بينما توفر Gemma 4 أعل
 • يظل تشغيل HDR معتمدًا على عميل Spoof Video Streams"</string>
   <string name="morphe_video_codec_title">ترميز الفيديو</string>
   <string name="morphe_video_codec_entry_default">الافتراضي</string>
+  <string name="morphe_video_codec_entry_av1" translatable="false">AV1 (مفضّل)</string>
   <!-- 'Spoof video streams' should be the same translation used for 'morphe_spoof_video_streams_screen_title'. -->
   <string name="morphe_video_codec_avc_not_available">لفرض استخدام AVC، غيّر \'Spoof Video Streams\' إلى \'Android Studio\' أو \'Android VR\' أو \'visionOS\'</string>
   <string name="morphe_video_codec_user_dialog_message">"VP9
