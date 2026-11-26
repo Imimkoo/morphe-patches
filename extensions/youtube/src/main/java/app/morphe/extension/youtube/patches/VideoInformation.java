@@ -306,6 +306,7 @@ public final class VideoInformation extends BaseVideoInformation {
         try {
             Logger.printDebug(() -> "newVideoStarted");
             SpoofVideoStreamsPatch.onPlaybackStarted();
+            PlaybackBufferPatch.onPlaybackStarted();
 
             WeakReference<PlaybackController> playerControllerRef =
                     new WeakReference<>(Objects.requireNonNull(playerController));
