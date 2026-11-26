@@ -236,9 +236,21 @@ public class DisableVideoCodecsPatch {
      * Injection point.
      */
     public static boolean allowCodec(String mimeType) {
-        final boolean allowed = !(getVideoCodec() == VideoCodec.VP9 && MIMETYPE_VIDEO_AV1.equals(mimeType));
+        final VideoCodec codec = getVideoCodec();
+        final boolean isVideoCodec = mimeType != null && mimeType.regionMatches(true, 0, "video/", 0, 6);
+        final boolean isAv1 = MIMETYPE_VIDEO_AV1.equalsIgnoreCase(mimeType);
+
+        // The AV1 preference is exclusive for video tracks. Audio MIME types are unaffected.
+        // This prevents YouTube from silently falling back to VP9 or AVC after AV1 was selected.
+        final boolean allowed = !isVideoCodec
+                || switch (codec) {
+                    case AV1 -> isAv1;
+                    case VP9, AVC -> !isAv1;
+                    case DEFAULT -> true;
+                };
+
         if (!allowed) {
-            Logger.printVerbose(() -> "Codec not allowed: " + mimeType);
+            Logger.printVerbose(() -> "Codec not allowed for " + codec + ": " + mimeType);
         }
         return allowed;
     }
