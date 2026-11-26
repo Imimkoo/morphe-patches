@@ -1724,11 +1724,11 @@ AVC (H.264)
   <string name="morphe_spoof_video_streams_about_720p_max">• قد تكون الجودة محدودة بدقة 720p</string>
   <string name="morphe_spoof_video_streams_player_js_variant_title">متغير JavaScript الخاص بالمشغل</string>
   <string name="morphe_spoof_video_streams_stats_for_nerds_title">عرض التمويه في \'إحصاءات تقنية\'</string>
-  <string name="morphe_sabr_video_readahead_tenths_title">الحد المستهدف لبفر الفيديو عبر SABR</string>
-  <string name="morphe_sabr_video_readahead_tenths_summary">أقصى مدة تحميل للفيديو أمام موضع التشغيل لعملاء SABR (من 0.5 إلى 30 ثانية). لا يغيّر بفر الصوت.</string>
+  <string name="morphe_sabr_video_readahead_tenths_title">الحد المستهدف لبفر الفيديو</string>
+  <string name="morphe_sabr_video_readahead_tenths_summary">أقصى مدة تحميل للفيديو أمام موضع التشغيل عبر SABR أو ExoPlayer (من 0.5 إلى 30 ثانية). لا يغيّر بفر الصوت.</string>
   <string name="morphe_sabr_video_readahead_low_tenths_title">البفر المنخفض بعد التنقل</string>
   <string name="morphe_sabr_video_readahead_resume_tenths_title">حد استئناف تحميل الفيديو</string>
-  <string name="morphe_sabr_video_readahead_resume_tenths_summary">عندما ينخفض الفيديو المحمّل أمام التشغيل إلى هذه القيمة، يستأنف SABR ملء البفر حتى الهدف المحدد (من 0.1 إلى 10 ثوانٍ).</string>
+  <string name="morphe_sabr_video_readahead_resume_tenths_summary">عندما ينخفض الفيديو المحمّل أمام التشغيل إلى هذه القيمة، يستأنف التحميل حتى الهدف المحدد (من 0.1 إلى 10 ثوانٍ).</string>
   <string name="morphe_sabr_video_readahead_low_tenths_summary">قيمة مؤقتة لبفر الفيديو أثناء اكتشاف التقديم أو الإرجاع (من 0.5 إلى 10 ثوانٍ).</string>
   <string name="morphe_sabr_video_readahead_stable_seconds_title">مدة استقرار التشغيل</string>
   <string name="morphe_sabr_video_readahead_stable_seconds_summary">مدة التشغيل المتواصل دون اكتشاف تنقل قبل العودة إلى قيمة البفر المستقرة (من 5 إلى 300 ثانية).</string>
