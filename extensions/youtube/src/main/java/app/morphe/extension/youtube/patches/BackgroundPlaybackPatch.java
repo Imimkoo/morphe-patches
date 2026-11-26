@@ -77,6 +77,7 @@ public class BackgroundPlaybackPatch {
                             handleScreenOff(context);
                         } else if (Intent.ACTION_SCREEN_ON.equals(intent.getAction())) {
                             pendingAutoPause = false;
+                            IbrahimVideoControlButton.onScreenOn();
                         }
                     }
                 }
@@ -91,6 +92,7 @@ public class BackgroundPlaybackPatch {
     }
 
     private static void handleScreenOff(Context context) {
+        IbrahimVideoControlButton.onScreenOff();
         AutoPauseOnLockMode mode = Settings.AUTO_PAUSE_ON_LOCK.get();
         if (mode == AutoPauseOnLockMode.OFF) {
             return;

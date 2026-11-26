@@ -120,6 +120,8 @@ public class SharedYouTubeSettings extends BaseSettings {
     // Spoof video streams
     public static final BooleanSetting SPOOF_VIDEO_STREAMS = new BooleanSetting("morphe_spoof_video_streams", TRUE, true, "morphe_spoof_video_streams_user_dialog_message");
     public static final BooleanSetting IBRAHIM_WELCOME_SHOWN = new BooleanSetting("morphe_ibrahim_welcome_shown", FALSE, false, false);
+    /** Automatically lower the video stream to 144p (or the lowest available quality) when the screen turns off. */
+    public static final BooleanSetting IBRAHIM_BACKGROUND_144P = new BooleanSetting("morphe_ibrahim_background_144p", TRUE, true, parent(SPOOF_VIDEO_STREAMS));
     /** Stable video buffer target, in tenths of a second. */
     public static final IntegerSetting SABR_VIDEO_READAHEAD_TENTHS = new IntegerSetting("morphe_sabr_video_readahead_tenths", 30, true, parent(SPOOF_VIDEO_STREAMS));
     /** Temporary lower target during seeking or unstable playback, in tenths of a second. */

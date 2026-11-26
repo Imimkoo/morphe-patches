@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.view.View;
+import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
@@ -15,12 +16,62 @@ import java.util.Locale;
 import app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch;
 import app.morphe.extension.shared.spoof.requests.StreamingDataRequest;
 import app.morphe.extension.youtube.patches.VideoInformation;
+import app.morphe.extension.youtube.patches.VideoInformation.VideoQualityInterface;
 import app.morphe.extension.youtube.settings.Settings;
 
 /** In-player entry point for Ibrahim's unified video buffer controls. */
 @SuppressWarnings("unused")
 public final class IbrahimVideoControlButton {
+    private static volatile VideoQualityInterface qualityBeforeBackground;
+    private static volatile String backgroundVideoId;
+
     private IbrahimVideoControlButton() {}
+
+    /** Called from the app's screen-off receiver on the main thread. */
+    public static void onScreenOff() {
+        if (!Settings.IBRAHIM_BACKGROUND_144P.get() || backgroundVideoId != null) {
+            return;
+        }
+        final String videoId = VideoInformation.getStartingOrPlayingVideoId();
+        final VideoQualityInterface[] qualities = VideoInformation.getCurrentQualities();
+        if (videoId == null || qualities == null || qualities.length == 0) {
+            return;
+        }
+        VideoQualityInterface lowest = null;
+        for (VideoQualityInterface quality : qualities) {
+            if (quality == null) continue;
+            final int resolution = quality.patch_getResolution();
+            if (resolution <= 0) continue; // Skip Auto and unknown entries.
+            if (lowest == null || resolution < lowest.patch_getResolution()) {
+                lowest = quality;
+            }
+        }
+        if (lowest == null) {
+            return;
+        }
+        final VideoQualityInterface current = VideoInformation.getCurrentQuality();
+        if (current == null || current.patch_getResolution() <= 144) {
+            return;
+        }
+        qualityBeforeBackground = current;
+        backgroundVideoId = videoId;
+        VideoInformation.changeQuality(lowest);
+    }
+
+    /** Restores the quality only when the same video is still loaded. */
+    public static void onScreenOn() {
+        final String savedVideoId = backgroundVideoId;
+        final VideoQualityInterface previous = qualityBeforeBackground;
+        backgroundVideoId = null;
+        qualityBeforeBackground = null;
+        if (savedVideoId == null || previous == null) {
+            return;
+        }
+        final String currentVideoId = VideoInformation.getStartingOrPlayingVideoId();
+        if (savedVideoId.equals(currentVideoId)) {
+            VideoInformation.changeQuality(previous);
+        }
+    }
 
     public static void initializeButton(View sourceButton) {
         TextView button = PlayerOverlayButton.addButtonWithTextOverlay(
@@ -81,6 +132,11 @@ public final class IbrahimVideoControlButton {
         boolean sabrActive = videoId != null && !videoId.isEmpty()
                 && StreamingDataRequest.playerClientUsesSABR(videoId);
 
+        CheckBox background144p = new CheckBox(context);
+        background144p.setText("خفض الجودة تلقائيًا إلى 144p عند إطفاء الشاشة");
+        background144p.setChecked(Settings.IBRAHIM_BACKGROUND_144P.get());
+        content.addView(background144p);
+
         TextView status = new TextView(context);
         boolean exoPlayerActive = VideoInformation.isExoPlayerInitialized();
         String engineStatus = sabrActive
@@ -116,6 +172,7 @@ public final class IbrahimVideoControlButton {
                     Settings.SABR_VIDEO_READAHEAD_LOW_TENTHS.save(pending[1]);
                     Settings.SABR_VIDEO_READAHEAD_RESUME_TENTHS.save(pending[2]);
                     Settings.SABR_VIDEO_READAHEAD_STABLE_SECONDS.save(pending[3]);
+                    Settings.IBRAHIM_BACKGROUND_144P.save(background144p.isChecked());
                 })
                 .show();
     }
