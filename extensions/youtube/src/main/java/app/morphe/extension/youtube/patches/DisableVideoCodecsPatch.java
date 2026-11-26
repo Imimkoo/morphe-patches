@@ -30,6 +30,7 @@ public class DisableVideoCodecsPatch {
 
     public enum VideoCodec {
         DEFAULT,
+        AV1,
         VP9,
         AVC
     }
@@ -144,10 +145,32 @@ public class DisableVideoCodecsPatch {
     }
 
     /**
-     * @return The default codec setting, which is VP9 if the device cannot hardware decode AV1.
+     * @return AV1 when Android advertises a software or hardware AV1 decoder.
+     * The bundled dav1d decoder may also be available independently of MediaCodec.
      */
     public static VideoCodec getDefaultVideoCodec() {
-        return hasHardwareAv1Decoder() ? VideoCodec.DEFAULT : VideoCodec.VP9;
+        return hasAnyAv1Decoder() ? VideoCodec.AV1 : VideoCodec.DEFAULT;
+    }
+
+    private static boolean hasAnyAv1Decoder() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return false;
+        }
+        try {
+            for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
+                if (info.isEncoder()) continue;
+                for (String type : info.getSupportedTypes()) {
+                    if (MIMETYPE_VIDEO_AV1.equalsIgnoreCase(type)) {
+                        Logger.printDebug(() -> "Found AV1 decoder: " + info.getName()
+                                + ", hardware=" + info.isHardwareAccelerated());
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            Logger.printException(() -> "hasAnyAv1Decoder failure", ex);
+        }
+        return false;
     }
 
     private static boolean hasHardwareAv1Decoder() {
@@ -186,7 +209,7 @@ public class DisableVideoCodecsPatch {
     }
 
     /**
-     * @return The codec in use, which is VP9 if AVC is selected but cannot be forced.
+     * @return The codec in use, with AV1 preferred when selected and VP9 excluded.
      */
     public static VideoCodec getVideoCodec() {
         VideoCodec codec = videoCodec;
@@ -201,7 +224,8 @@ public class DisableVideoCodecsPatch {
      * Injection point.
      */
     public static boolean allowVP9() {
-        final boolean allowed = getVideoCodec() != VideoCodec.AVC;
+        final VideoCodec codec = getVideoCodec();
+        final boolean allowed = codec != VideoCodec.AVC && codec != VideoCodec.AV1;
         if (!allowed) {
             Logger.printVerbose(() -> "VP9 not allowed");
         }
@@ -212,7 +236,8 @@ public class DisableVideoCodecsPatch {
      * Injection point.
      */
     public static boolean allowCodec(String mimeType) {
-        final boolean allowed = !(getVideoCodec() == VideoCodec.VP9 && MIMETYPE_VIDEO_AV1.equals(mimeType));
+        final VideoCodec codec = getVideoCodec();
+        final boolean allowed = codec != VideoCodec.VP9 || !MIMETYPE_VIDEO_AV1.equals(mimeType);
         if (!allowed) {
             Logger.printVerbose(() -> "Codec not allowed: " + mimeType);
         }
