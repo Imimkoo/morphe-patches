@@ -12,6 +12,7 @@ import android.widget.TextView;
 
 import java.util.Locale;
 
+import app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch;
 import app.morphe.extension.shared.spoof.requests.StreamingDataRequest;
 import app.morphe.extension.youtube.patches.VideoInformation;
 import app.morphe.extension.youtube.settings.Settings;
@@ -82,11 +83,21 @@ public final class IbrahimVideoControlButton {
 
         TextView status = new TextView(context);
         boolean exoPlayerActive = VideoInformation.isExoPlayerInitialized();
-        status.setText(sabrActive
+        String engineStatus = sabrActive
                 ? "المسار الحالي يستخدم SABR — التحكم في بفر الفيديو نشط."
                 : exoPlayerActive
                         ? "المسار الحالي يستخدم ExoPlayer — التحكم في بفر الفيديو نشط."
-                        : "لم يتم التعرف على محرك البث الحالي؛ إعدادات البفر محفوظة لكن تطبيقها غير مؤكد.");
+                        : "لم يتم التعرف على محرك البث الحالي؛ إعدادات البفر محفوظة لكن تطبيقها غير مؤكد.";
+        if (sabrActive) {
+            String mimeType = SpoofVideoStreamsPatch.getSabrVideoMimeType();
+            long receivedBytes = SpoofVideoStreamsPatch.getSabrReceivedBytes();
+            engineStatus += "\\n\\nترميز الفيديو: " + (mimeType == null ? "لم يُحدد بعد" : mimeType)
+                    + "\\nبيانات SABR المستلمة: " + formatDataSize(receivedBytes)
+                    + " (تشمل ترويسات النقل).";
+        } else if (exoPlayerActive) {
+            engineStatus += "\\n\\nتفاصيل الترميز وحجم البيانات غير متاحة من واجهة ExoPlayer الحالية.";
+        }
+        status.setText(engineStatus);
         status.setTextSize(13);
         status.setPadding(0, 0, 0, dp(context, 12));
         content.addView(status);
@@ -107,6 +118,16 @@ public final class IbrahimVideoControlButton {
                     Settings.SABR_VIDEO_READAHEAD_STABLE_SECONDS.save(pending[3]);
                 })
                 .show();
+    }
+
+    private static String formatDataSize(long bytes) {
+        if (bytes >= 1024L * 1024L) {
+            return String.format(Locale.US, "%.2f MB", bytes / (1024.0 * 1024.0));
+        }
+        if (bytes >= 1024L) {
+            return String.format(Locale.US, "%.1f KB", bytes / 1024.0);
+        }
+        return bytes + " B";
     }
 
     private static void addSlider(Context context, LinearLayout parent, String title,

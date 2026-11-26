@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.settings.SharedYouTubeSettings;
@@ -91,7 +92,9 @@ final class SabrReadaheadLimit {
      */
     private static final Map<Integer, FormatBitrate> bitrates = new HashMap<>();
     /** MIME type classification supplied by SABR format initialization metadata. */
-    private static final Map<Integer, Boolean> videoFormats = new HashMap<>();
+    private static final Map<Integer, String> videoFormats = new HashMap<>();
+    /** Total SABR response bytes observed since the current video started (includes UMP headers). */
+    private static final AtomicLong receivedBytes = new AtomicLong();
     private static final Map<Object, Map<Integer, PendingVideoSegment>> pendingVideoSegments =
             Collections.synchronizedMap(new WeakHashMap<>());
     private static volatile long playbackGeneration;
@@ -124,6 +127,7 @@ final class SabrReadaheadLimit {
         lastPlaybackUpdateMs = -1;
         stableSinceMs = SystemClock.elapsedRealtime();
         playbackGeneration++;
+        receivedBytes.set(0L);
         responseReaders.clear();
         synchronized (pendingVideoSegments) {
             pendingVideoSegments.clear();
@@ -171,6 +175,21 @@ final class SabrReadaheadLimit {
     static long getConfiguredVideoResumeMs(long targetMs) {
         final long configuredResumeMs = SharedYouTubeSettings.SABR_VIDEO_READAHEAD_RESUME_TENTHS.get() * 100L;
         return Math.max(100L, Math.min(configuredResumeMs, targetMs - 100L));
+    }
+
+    static long getReceivedBytesThisPlayback() {
+        return receivedBytes.get();
+    }
+
+    @Nullable
+    static String getActiveVideoMimeType() {
+        final int itag;
+        synchronized (videoBufferLock) {
+            itag = activeVideoItag;
+        }
+        synchronized (videoFormats) {
+            return videoFormats.get(itag);
+        }
     }
 
     private static long getVideoReadaheadLimitMs(long memoryLimitMs) {
@@ -226,6 +245,7 @@ final class SabrReadaheadLimit {
             return;
         }
         try {
+            receivedBytes.addAndGet(chunk.remaining());
             reader.read(chunk);
         } catch (Exception ex) {
             responseReaders.remove(callbacks);
@@ -292,10 +312,12 @@ final class SabrReadaheadLimit {
                 bitrate.receivedTime = SystemClock.elapsedRealtime();
             }
 
-            final boolean isVideo;
+            final String mimeType;
             synchronized (videoFormats) {
-                isVideo = Boolean.TRUE.equals(videoFormats.get(itag));
+                mimeType = videoFormats.get(itag);
             }
+            final boolean isVideo = mimeType != null
+                    && mimeType.regionMatches(true, 0, "video/", 0, 6);
             if (isVideo && headerId >= 0 && startTimeMs >= 0) {
                 synchronized (pendingVideoSegments) {
                     Map<Integer, PendingVideoSegment> requestSegments =
@@ -367,7 +389,7 @@ final class SabrReadaheadLimit {
             }
             if (itag >= 0 && mimeType != null) {
                 synchronized (videoFormats) {
-                    videoFormats.put(itag, mimeType.regionMatches(true, 0, "video/", 0, 6));
+                    videoFormats.put(itag, mimeType);
                 }
             }
         } catch (IOException ex) {

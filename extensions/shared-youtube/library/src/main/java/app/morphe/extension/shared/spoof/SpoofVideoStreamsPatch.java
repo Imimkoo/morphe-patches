@@ -345,6 +345,17 @@ public class SpoofVideoStreamsPatch {
         return SabrReadaheadLimit.getConfiguredVideoResumeMs(targetMs);
     }
 
+    /** Returns the latest completed SABR video format MIME type, or null if not observed yet. */
+    @Nullable
+    public static String getSabrVideoMimeType() {
+        return SabrReadaheadLimit.getActiveVideoMimeType();
+    }
+
+    /** Returns approximate SABR response bytes received since the current video started. */
+    public static long getSabrReceivedBytes() {
+        return SabrReadaheadLimit.getReceivedBytesThisPlayback();
+    }
+
     /**
      * Injection point.
      * Only invoked when playing a live stream on an Apple client.
