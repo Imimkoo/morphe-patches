@@ -1,7 +1,9 @@
 package app.morphe.extension.youtube.videoplayer;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
@@ -28,7 +30,33 @@ public final class IbrahimVideoControlButton {
         if (button != null) {
             button.setText("إب");
             button.setContentDescription("إعدادات إبراهيم للفيديو");
+            showWelcome(contextFor(button.getContext()));
         }
+    }
+
+    private static Activity contextFor(Context context) {
+        Context current = context;
+        while (current instanceof ContextWrapper && !(current instanceof Activity)) {
+            current = ((ContextWrapper) current).getBaseContext();
+        }
+        return current instanceof Activity ? (Activity) current : null;
+    }
+
+    private static void showWelcome(Activity activity) {
+        if (activity == null || Settings.IBRAHIM_WELCOME_SHOWN.get()) {
+            return;
+        }
+        Settings.IBRAHIM_WELCOME_SHOWN.save(true);
+        activity.getWindow().getDecorView().post(() -> {
+            if (activity.isFinishing()) {
+                return;
+            }
+            new AlertDialog.Builder(activity)
+                    .setTitle("مرحبًا إبراهيم")
+                    .setMessage("تم تجهيز مشغل الفيديو الخاص بك.\\n\\nإعداد وتطوير: إبراهيم")
+                    .setPositiveButton("ابدأ", null)
+                    .show();
+        });
     }
 
     private static void showDialog(Context context) {
