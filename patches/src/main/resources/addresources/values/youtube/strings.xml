@@ -1748,13 +1748,6 @@ Videos are requested by a short prefix of the hashed video ID, so the server can
     <string name="morphe_external_browser_title">Open links in browser</string>
     <string name="morphe_external_browser_summary">Opens links in an external browser instead of the in-app browser</string>
 
-    <!-- video.buffer.playbackBufferPatch -->
-    <string name="morphe_playback_buffer_size_title">Playback buffer size</string>
-    <string name="morphe_playback_buffer_size_entry_default">Default</string>
-    <string name="morphe_playback_buffer_size_entry_low">Low</string>
-    <string name="morphe_playback_buffer_size_entry_medium">Medium</string>
-    <string name="morphe_playback_buffer_size_entry_maximum">Maximum</string>
-
     <!-- video.delay.videoDelayPatch -->
     <string name="morphe_video_delay_title">Video delay</string>
     <string name="morphe_video_delay_summary">Delays the video to keep it in sync with laggy audio, such as Bluetooth headphones (0-5000 ms)</string>
