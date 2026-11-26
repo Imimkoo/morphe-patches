@@ -53,7 +53,7 @@ public final class IbrahimVideoControlButton {
             }
             new AlertDialog.Builder(activity)
                     .setTitle("مرحبًا إبراهيم")
-                    .setMessage("تم تجهيز مشغل الفيديو الخاص بك.\\n\\nإعداد وتطوير: إبراهيم")
+                    .setMessage("تم تجهيز مشغل الفيديو الخاص بك.\n\nإعداد وتطوير: إبراهيم")
                     .setPositiveButton("ابدأ", null)
                     .show();
         });
@@ -86,7 +86,7 @@ public final class IbrahimVideoControlButton {
 
         addSlider(context, content, "البفر المستقر", pending, 0, 5, 300, 1, true);
         addSlider(context, content, "البفر المنخفض أثناء التقديم والإرجاع", pending, 1, 5, 100, 1, true);
-        addSlider(context, content, "حد استئناف التحميل", pending, 2, 5, 100, 1, true);
+        addSlider(context, content, "حد استئناف التحميل", pending, 2, 1, 100, 1, true);
         addSlider(context, content, "مدة الاستقرار", pending, 3, 5, 300, 5, false);
 
         new AlertDialog.Builder(context)
