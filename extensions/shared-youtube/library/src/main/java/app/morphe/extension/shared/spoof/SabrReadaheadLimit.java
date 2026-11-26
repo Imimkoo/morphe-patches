@@ -36,10 +36,20 @@ import app.morphe.extension.shared.settings.SharedYouTubeSettings;
 final class SabrReadaheadLimit {
     private static final int PART_MEDIA_HEADER = 20;
     private static final int PART_NEXT_REQUEST_POLICY = 35;
+    private static final int PART_FORMAT_INITIALIZATION_METADATA = 42;
 
     private static final int MEDIA_HEADER_ITAG_FIELD = 3;
+    private static final int MEDIA_HEADER_START_MS_FIELD = 11;
+    private static final int MEDIA_HEADER_TIME_RANGE_FIELD = 15;
     private static final int MEDIA_HEADER_DURATION_MS_FIELD = 12;
     private static final int MEDIA_HEADER_CONTENT_LENGTH_FIELD = 14;
+
+    private static final int FORMAT_INIT_FORMAT_ID_FIELD = 2;
+    private static final int FORMAT_INIT_MIME_TYPE_FIELD = 5;
+    private static final int FORMAT_ID_ITAG_FIELD = 1;
+    private static final int TIME_RANGE_START_FIELD = 1;
+    private static final int TIME_RANGE_DURATION_FIELD = 2;
+    private static final int TIME_RANGE_TIMESCALE_FIELD = 3;
 
     private static final int POLICY_TARGET_AUDIO_READAHEAD_MS_FIELD = 1;
     private static final int POLICY_TARGET_VIDEO_READAHEAD_MS_FIELD = 2;
@@ -78,6 +88,12 @@ final class SabrReadaheadLimit {
      * The formats of all streams are counted together, which can only lower the limit.
      */
     private static final Map<Integer, FormatBitrate> bitrates = new HashMap<>();
+    /** MIME type classification supplied by SABR format initialization metadata. */
+    private static final Map<Integer, Boolean> videoFormats = new HashMap<>();
+    private static final Object videoBufferLock = new Object();
+    private static int activeVideoItag = -1;
+    private static long furthestBufferedVideoEndMs = -1;
+    private static boolean holdingVideoRequests;
 
     private static long lastLoggedLimitMs;
 
@@ -90,6 +106,11 @@ final class SabrReadaheadLimit {
         lastPlaybackPositionMs = -1;
         lastPlaybackUpdateMs = -1;
         stableSinceMs = SystemClock.elapsedRealtime();
+        synchronized (videoBufferLock) {
+            activeVideoItag = -1;
+            furthestBufferedVideoEndMs = -1;
+            holdingVideoRequests = false;
+        }
     }
 
     static void onPlaybackTime(long positionMs) {
@@ -112,6 +133,8 @@ final class SabrReadaheadLimit {
 
         lastPlaybackPositionMs = positionMs;
         lastPlaybackUpdateMs = now;
+        // Playback position and received media headers together provide a buffered-ahead estimate.
+        getVideoReadaheadLimitMs(getReadaheadLimitMs());
     }
 
     private static long getVideoReadaheadLimitMs(long memoryLimitMs) {
@@ -120,7 +143,25 @@ final class SabrReadaheadLimit {
         final int targetTenths = stable
                 ? SharedYouTubeSettings.SABR_VIDEO_READAHEAD_TENTHS.get()
                 : SharedYouTubeSettings.SABR_VIDEO_READAHEAD_LOW_TENTHS.get();
-        return Math.max(500L, Math.min(memoryLimitMs, targetTenths * 100L));
+        final long targetMs = Math.max(500L, Math.min(memoryLimitMs, targetTenths * 100L));
+        final long configuredResumeMs = SharedYouTubeSettings.SABR_VIDEO_READAHEAD_RESUME_TENTHS.get() * 100L;
+        final long resumeMs = Math.max(100L, Math.min(configuredResumeMs, targetMs - 100L));
+
+        synchronized (videoBufferLock) {
+            if (lastPlaybackPositionMs >= 0 && furthestBufferedVideoEndMs >= 0) {
+                final long bufferedAheadMs = furthestBufferedVideoEndMs - lastPlaybackPositionMs;
+                if (holdingVideoRequests) {
+                    if (bufferedAheadMs <= resumeMs) {
+                        holdingVideoRequests = false;
+                        Logger.printDebug(() -> "SABR video readahead resumed at " + bufferedAheadMs + "ms ahead");
+                    }
+                } else if (bufferedAheadMs >= targetMs) {
+                    holdingVideoRequests = true;
+                    Logger.printDebug(() -> "SABR video readahead held at " + bufferedAheadMs + "ms ahead");
+                }
+            }
+            return Math.max(100L, Math.min(memoryLimitMs, holdingVideoRequests ? resumeMs : targetMs));
+        }
     }
 
     private static final class FormatBitrate {
@@ -137,7 +178,13 @@ final class SabrReadaheadLimit {
     static void onRequest(Object callbacks) {
         responseReaders.put(callbacks, new SabrResponseReader(
                 SabrReadaheadLimit::limitReadahead, PART_NEXT_REQUEST_POLICY,
-                (partType, part) -> onMediaHeader(part), PART_MEDIA_HEADER));
+                (partType, part) -> {
+                    if (partType == PART_MEDIA_HEADER) {
+                        onMediaHeader(part);
+                    } else if (partType == PART_FORMAT_INITIALIZATION_METADATA) {
+                        onFormatInitializationMetadata(part);
+                    }
+                }, PART_MEDIA_HEADER, PART_FORMAT_INITIALIZATION_METADATA));
     }
 
     static void onResponseChunk(Object callbacks, ByteBuffer chunk) {
@@ -157,18 +204,43 @@ final class SabrReadaheadLimit {
         try {
             CodedInputStream input = CodedInputStream.newInstance(part);
             int itag = -1;
+            long startTimeMs = -1;
             long durationMs = 0;
             long contentLength = 0;
+            byte[] timeRange = null;
             int tag;
             while ((tag = input.readTag()) != 0) {
                 switch (WireFormat.getTagFieldNumber(tag)) {
                     case MEDIA_HEADER_ITAG_FIELD -> itag = input.readInt32();
+                    case MEDIA_HEADER_START_MS_FIELD -> startTimeMs = input.readInt64();
                     case MEDIA_HEADER_DURATION_MS_FIELD -> durationMs = input.readInt64();
                     case MEDIA_HEADER_CONTENT_LENGTH_FIELD -> contentLength = input.readInt64();
+                    case MEDIA_HEADER_TIME_RANGE_FIELD -> timeRange = input.readByteArray();
                     default -> input.skipField(tag);
                 }
             }
-            // Init segments have no duration.
+            if (timeRange != null && (startTimeMs < 0 || durationMs <= 0)) {
+                long startTicks = 0;
+                long durationTicks = 0;
+                long timescale = 0;
+                CodedInputStream range = CodedInputStream.newInstance(timeRange);
+                while (!range.isAtEnd()) {
+                    int rangeTag = range.readTag();
+                    if (rangeTag == 0) break;
+                    switch (WireFormat.getTagFieldNumber(rangeTag)) {
+                        case TIME_RANGE_START_FIELD -> startTicks = range.readInt64();
+                        case TIME_RANGE_DURATION_FIELD -> durationTicks = range.readInt64();
+                        case TIME_RANGE_TIMESCALE_FIELD -> timescale = range.readInt64();
+                        default -> range.skipField(rangeTag);
+                    }
+                }
+                if (timescale > 0) {
+                    if (startTimeMs < 0 && startTicks > 0) startTimeMs = startTicks * 1000L / timescale;
+                    if (durationMs <= 0 && durationTicks > 0) durationMs = durationTicks * 1000L / timescale;
+                }
+            }
+
+            // Init segments have no duration or start time.
             if (itag < 0 || durationMs <= 0 || contentLength <= 0) {
                 return;
             }
@@ -183,8 +255,60 @@ final class SabrReadaheadLimit {
                 bitrate.bytesPerMs = Math.max(bytesPerMs, bitrate.bytesPerMs * BITRATE_DECAY);
                 bitrate.receivedTime = SystemClock.elapsedRealtime();
             }
+
+            final boolean isVideo;
+            synchronized (videoFormats) {
+                isVideo = Boolean.TRUE.equals(videoFormats.get(itag));
+            }
+            if (isVideo && startTimeMs >= 0) {
+                final long segmentEndMs = startTimeMs + durationMs;
+                synchronized (videoBufferLock) {
+                    if (activeVideoItag != itag) {
+                        activeVideoItag = itag;
+                        furthestBufferedVideoEndMs = segmentEndMs;
+                    } else {
+                        furthestBufferedVideoEndMs = Math.max(furthestBufferedVideoEndMs, segmentEndMs);
+                    }
+                }
+            }
         } catch (IOException ex) {
             Logger.printInfo(() -> "Could not read media header", ex);
+        }
+    }
+
+    /** Records which SABR itags are video tracks so audio segments do not affect video hysteresis. */
+    private static void onFormatInitializationMetadata(byte[] part) {
+        try {
+            CodedInputStream input = CodedInputStream.newInstance(part);
+            int itag = -1;
+            String mimeType = null;
+            while (!input.isAtEnd()) {
+                int tag = input.readTag();
+                if (tag == 0) break;
+                switch (WireFormat.getTagFieldNumber(tag)) {
+                    case FORMAT_INIT_FORMAT_ID_FIELD -> {
+                        CodedInputStream formatId = CodedInputStream.newInstance(input.readByteArray());
+                        while (!formatId.isAtEnd()) {
+                            int formatTag = formatId.readTag();
+                            if (formatTag == 0) break;
+                            if (WireFormat.getTagFieldNumber(formatTag) == FORMAT_ID_ITAG_FIELD) {
+                                itag = formatId.readInt32();
+                            } else {
+                                formatId.skipField(formatTag);
+                            }
+                        }
+                    }
+                    case FORMAT_INIT_MIME_TYPE_FIELD -> mimeType = input.readString();
+                    default -> input.skipField(tag);
+                }
+            }
+            if (itag >= 0 && mimeType != null) {
+                synchronized (videoFormats) {
+                    videoFormats.put(itag, mimeType.regionMatches(true, 0, "video/", 0, 6));
+                }
+            }
+        } catch (IOException ex) {
+            Logger.printInfo(() -> "Could not read SABR format initialization metadata", ex);
         }
     }
 
