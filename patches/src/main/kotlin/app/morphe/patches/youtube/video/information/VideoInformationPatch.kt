@@ -560,6 +560,7 @@ val videoInformationPatch = patch(
         onCreateHook(EXTENSION_CLASS, "initialize")
         videoSpeedChangedHook(EXTENSION_CLASS, "videoSpeedChanged")
         userSelectedPlaybackSpeedHook(EXTENSION_CLASS, "userSelectedPlaybackSpeed")
+        videoTimeHook(EXTENSION_CLASS, "videoTimeChanged")
 
         onCreateHook(EXTENSION_ADD_ON_API_CLASS_DESCRIPTOR, "newVideoStarted")
         videoTimeHook(EXTENSION_ADD_ON_API_CLASS_DESCRIPTOR, "videoTimeChanged")
