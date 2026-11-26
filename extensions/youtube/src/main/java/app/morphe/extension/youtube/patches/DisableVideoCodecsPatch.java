@@ -18,6 +18,9 @@ import android.view.Display;
 import androidx.annotation.Nullable;
 
 import java.util.List;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.settings.SharedYouTubeSettings;
@@ -30,6 +33,7 @@ public class DisableVideoCodecsPatch {
 
     public enum VideoCodec {
         DEFAULT,
+        AV1,
         VP9,
         AVC
     }
@@ -45,6 +49,10 @@ public class DisableVideoCodecsPatch {
      */
     @Nullable
     private static volatile VideoCodec videoCodec;
+
+    /** AV1 availability by video ID, because YouTube can load feed/Shorts responses concurrently. */
+    private static final Map<String, Boolean> responseAv1Availability =
+            Collections.synchronizedMap(new LinkedHashMap<>());
 
     private static final int[] EMPTY_ARRAY_INT = new int[0];
 
@@ -144,10 +152,32 @@ public class DisableVideoCodecsPatch {
     }
 
     /**
-     * @return The default codec setting, which is VP9 if the device cannot hardware decode AV1.
+     * @return AV1 when Android advertises an AV1 decoder. This includes software decoders;
+     * hardware acceleration is not assumed.
      */
     public static VideoCodec getDefaultVideoCodec() {
-        return hasHardwareAv1Decoder() ? VideoCodec.DEFAULT : VideoCodec.VP9;
+        return hasAnyAv1Decoder() ? VideoCodec.AV1 : VideoCodec.DEFAULT;
+    }
+
+    private static boolean hasAnyAv1Decoder() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return false;
+        }
+        try {
+            for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
+                if (info.isEncoder()) continue;
+                for (String type : info.getSupportedTypes()) {
+                    if (MIMETYPE_VIDEO_AV1.equalsIgnoreCase(type)) {
+                        Logger.printDebug(() -> "Found AV1 decoder: " + info.getName()
+                                + ", hardware=" + info.isHardwareAccelerated());
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            Logger.printException(() -> "hasAnyAv1Decoder failure", ex);
+        }
+        return false;
     }
 
     private static boolean hasHardwareAv1Decoder() {
@@ -198,10 +228,37 @@ public class DisableVideoCodecsPatch {
     }
 
     /**
+     * Called for every player response, independently of the selected spoof client.
+     * The preference must never make a client with no AV1 streams unplayable.
+     */
+    public static void observeAdaptiveFormats(@Nullable String videoId, boolean hasAv1) {
+        if (videoId == null || videoId.isEmpty()) {
+            return;
+        }
+        synchronized (responseAv1Availability) {
+            responseAv1Availability.put(videoId, hasAv1);
+            while (responseAv1Availability.size() > 50) {
+                String oldestVideoId = responseAv1Availability.keySet().iterator().next();
+                responseAv1Availability.remove(oldestVideoId);
+            }
+        }
+        Logger.printDebug(() -> "Player response AV1 availability for " + videoId + ": " + hasAv1);
+    }
+
+    private static boolean currentResponseHasAv1() {
+        final String videoId = VideoInformation.getStartingOrPlayingVideoId();
+        synchronized (responseAv1Availability) {
+            return Boolean.TRUE.equals(responseAv1Availability.get(videoId));
+        }
+    }
+
+    /**
      * Injection point.
      */
     public static boolean allowVP9() {
-        final boolean allowed = getVideoCodec() != VideoCodec.AVC;
+        final VideoCodec codec = getVideoCodec();
+        final boolean av1CanBeSelected = codec == VideoCodec.AV1 && currentResponseHasAv1();
+        final boolean allowed = codec != VideoCodec.AVC && !av1CanBeSelected;
         if (!allowed) {
             Logger.printVerbose(() -> "VP9 not allowed");
         }
@@ -212,9 +269,24 @@ public class DisableVideoCodecsPatch {
      * Injection point.
      */
     public static boolean allowCodec(String mimeType) {
-        final boolean allowed = !(getVideoCodec() == VideoCodec.VP9 && MIMETYPE_VIDEO_AV1.equals(mimeType));
+        final VideoCodec codec = getVideoCodec();
+        final boolean isVideoCodec = mimeType != null && mimeType.regionMatches(true, 0, "video/", 0, 6);
+        final boolean isAv1 = mimeType != null
+                && mimeType.toLowerCase(java.util.Locale.ROOT).contains("av01");
+
+        // AV1 is exclusive only when the current response offers it. Some spoof clients
+        // (including older VR profiles) do not receive AV1 at all; in that case keep the
+        // original formats available instead of returning an empty/unplayable track list.
+        final boolean av1CanBeSelected = codec == VideoCodec.AV1 && currentResponseHasAv1();
+        final boolean allowed = !isVideoCodec
+                || switch (codec) {
+                    case AV1 -> !av1CanBeSelected || isAv1;
+                    case VP9, AVC -> !isAv1;
+                    case DEFAULT -> true;
+                };
+
         if (!allowed) {
-            Logger.printVerbose(() -> "Codec not allowed: " + mimeType);
+            Logger.printVerbose(() -> "Codec not allowed for " + codec + ": " + mimeType);
         }
         return allowed;
     }

@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch;
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.patches.BaseVideoInformation;
@@ -309,6 +310,8 @@ public final class VideoInformation extends BaseVideoInformation {
     public static void initialize(PlaybackController playerController) {
         try {
             Logger.printDebug(() -> "newVideoStarted");
+            SpoofVideoStreamsPatch.onPlaybackStarted();
+            PlaybackBufferPatch.onPlaybackStarted();
 
             WeakReference<PlaybackController> playerControllerRef =
                     new WeakReference<>(Objects.requireNonNull(playerController));
@@ -342,6 +345,15 @@ public final class VideoInformation extends BaseVideoInformation {
         } catch (Exception ex) {
             Logger.printException(() -> "initialize failure", ex);
         }
+    }
+
+    /** Called about once per second with the current playback position. */
+    public static void videoTimeChanged(long positionMs) {
+        SpoofVideoStreamsPatch.onPlaybackTime(positionMs);
+    }
+
+    public static boolean isExoPlayerInitialized() {
+        return exoPlayerImplRef != null && exoPlayerImplRef.get() != null;
     }
 
     /**

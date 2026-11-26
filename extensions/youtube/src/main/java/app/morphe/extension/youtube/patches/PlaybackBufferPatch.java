@@ -1,64 +1,69 @@
-/*
- * Copyright 2026 Morphe.
- * https://github.com/MorpheApp/morphe-patches/pull/3386
- *
- * See the included NOTICE file for GPLv3 Section 7 terms that apply to this code.
- */
-
 package app.morphe.extension.youtube.patches;
 
+import app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch;
 import app.morphe.extension.youtube.settings.Settings;
 
+/**
+ * ExoPlayer adapter for the shared target/resume buffer policy.
+ * The SABR adapter controls NextRequestPolicy; this adapter controls shouldContinueLoading.
+ */
 @SuppressWarnings("unused")
-public class PlaybackBufferPatch {
+public final class PlaybackBufferPatch {
+    private static final long FORCED_STOP_BUFFERED_US = 120_000_000L;
+    private static volatile long playbackGeneration;
 
-    public enum PlaybackBufferSize {
-        DEFAULT(1),
-        LOW(2),
-        MEDIUM(4),
-        MAXIMUM(8);
+    private static final class ThreadState {
+        long generation = -1;
+        boolean holding;
+    }
 
-        /**
-         * Upper limit for the buffer memory, regardless of the selected size.
-         */
-        private static final int MAX_BYTE_LIMIT = 128 * 1024 * 1024;
+    private static final ThreadLocal<ThreadState> state =
+            ThreadLocal.withInitial(ThreadState::new);
 
-        private final int multiplier;
+    private PlaybackBufferPatch() {}
 
-        PlaybackBufferSize(int multiplier) {
-            this.multiplier = multiplier;
-        }
-
-        public long scaleBufferedDurationUs(long bufferedUs) {
-            if (this == DEFAULT) {
-                return bufferedUs;
-            }
-            return bufferedUs / multiplier;
-        }
-
-        public int scaleByteLimit(int bytes) {
-            if (this == DEFAULT) {
-                return bytes;
-            }
-
-            final long scaled = (long) bytes * multiplier;
-            return (int) Math.min(scaled, Math.max(bytes, MAX_BYTE_LIMIT));
-        }
+    /** Reset hysteresis when YouTube starts a different video. */
+    public static void onPlaybackStarted() {
+        playbackGeneration++;
     }
 
     /**
-     * Injection point.
-     * <p>
-     * Dividing the buffered duration is the same as multiplying the duration limits.
+     * Re-shapes ExoPlayer's buffered-duration input so its existing load-control decision
+     * observes the same target/resume hysteresis as the SABR adapter.
      */
-    public static long scaleBufferedDurationUs(long bufferedUs) {
-        return Settings.PLAYBACK_BUFFER_SIZE.get().scaleBufferedDurationUs(bufferedUs);
-    }
+    public static long adjustBufferedDurationUs(long bufferedDurationUs) {
+        if (!Settings.SPOOF_VIDEO_STREAMS.get()) {
+            return bufferedDurationUs;
+        }
 
-    /**
-     * Injection point.
-     */
-    public static int scaleByteLimit(int bytes) {
-        return Settings.PLAYBACK_BUFFER_SIZE.get().scaleByteLimit(bytes);
+        ThreadState current = state.get();
+        final long generation = playbackGeneration;
+        if (current.generation != generation) {
+            current.generation = generation;
+            current.holding = false;
+        }
+
+        final long targetUs = Math.max(500_000L,
+                SpoofVideoStreamsPatch.getVideoBufferTargetMs() * 1000L);
+        final long resumeUs = Math.max(100_000L,
+                Math.min(SpoofVideoStreamsPatch.getVideoBufferResumeMs(targetUs / 1000L) * 1000L,
+                        targetUs - 100_000L));
+
+        if (current.holding) {
+            if (bufferedDurationUs <= resumeUs) {
+                current.holding = false;
+            } else {
+                return FORCED_STOP_BUFFERED_US;
+            }
+        }
+
+        if (bufferedDurationUs >= targetUs) {
+            current.holding = true;
+            return FORCED_STOP_BUFFERED_US;
+        }
+
+        // Below the target, make the original load-control logic see a low buffer and continue
+        // loading, while preserving its independent byte-size safety checks.
+        return 0L;
     }
 }
