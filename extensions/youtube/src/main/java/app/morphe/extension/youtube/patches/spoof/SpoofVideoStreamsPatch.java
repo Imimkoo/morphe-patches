@@ -37,7 +37,9 @@ public class SpoofVideoStreamsPatch {
         // AVC cannot be forced with these clients because they use VP9 and AV1.
         // VP9 blocks AV1, so the AV1 clients are not used.
         final VideoCodec codec = DisableVideoCodecsPatch.getVideoCodec();
-        if (Settings.SPOOF_VIDEO_STREAMS_AV1.get() && codec == VideoCodec.DEFAULT) {
+        // An explicit AV1 codec preference must also select an AV1-capable spoof client.
+        // The separate AV1 toggle remains useful when the codec preference is left on Default.
+        if (codec == VideoCodec.AV1 || (Settings.SPOOF_VIDEO_STREAMS_AV1.get() && codec == VideoCodec.DEFAULT)) {
             if (client == ClientType.ANDROID_VR_DASH) {
                 client = ClientType.ANDROID_XR_DASH;
             } else if (client == ClientType.ANDROID_VR_SABR) {
