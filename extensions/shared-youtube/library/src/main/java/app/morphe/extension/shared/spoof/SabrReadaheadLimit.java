@@ -103,7 +103,7 @@ final class SabrReadaheadLimit {
             final long elapsedMs = Math.max(1L, now - previousUpdate);
             final long deltaMs = positionMs - previousPosition;
             final long jumpThresholdMs = Math.max(2500L, elapsedMs * 3L + 500L);
-            if (deltaMs <= 0L || deltaMs > jumpThresholdMs) {
+            if (elapsedMs > 2500L || deltaMs <= 0L || deltaMs > jumpThresholdMs) {
                 stableSinceMs = now;
                 Logger.printDebug(() -> "SABR low video readahead: timeline movement detected (delta="
                         + deltaMs + "ms)");
