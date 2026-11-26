@@ -16,7 +16,7 @@ import app.morphe.extension.shared.spoof.requests.StreamingDataRequest;
 import app.morphe.extension.youtube.patches.VideoInformation;
 import app.morphe.extension.youtube.settings.Settings;
 
-/** In-player entry point for Ibrahim's SABR video buffer controls. */
+/** In-player entry point for Ibrahim's unified video buffer controls. */
 @SuppressWarnings("unused")
 public final class IbrahimVideoControlButton {
     private IbrahimVideoControlButton() {}
