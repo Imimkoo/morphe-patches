@@ -81,6 +81,48 @@ final class SabrReadaheadLimit {
 
     private static long lastLoggedLimitMs;
 
+    /** Playback clock observations used to detect seeking and rapid timeline navigation. */
+    private static volatile long lastPlaybackPositionMs = -1;
+    private static volatile long lastPlaybackUpdateMs = -1;
+    private static volatile long stableSinceMs = SystemClock.elapsedRealtime();
+
+    static void onPlaybackStarted() {
+        lastPlaybackPositionMs = -1;
+        lastPlaybackUpdateMs = -1;
+        stableSinceMs = SystemClock.elapsedRealtime();
+    }
+
+    static void onPlaybackTime(long positionMs) {
+        final long now = SystemClock.elapsedRealtime();
+        final long previousPosition = lastPlaybackPositionMs;
+        final long previousUpdate = lastPlaybackUpdateMs;
+
+        if (previousPosition < 0 || previousUpdate < 0) {
+            stableSinceMs = now;
+        } else {
+            final long elapsedMs = Math.max(1L, now - previousUpdate);
+            final long deltaMs = positionMs - previousPosition;
+            final long jumpThresholdMs = Math.max(2500L, elapsedMs * 3L + 500L);
+            if (deltaMs <= 0L || deltaMs > jumpThresholdMs) {
+                stableSinceMs = now;
+                Logger.printDebug(() -> "SABR low video readahead: timeline movement detected (delta="
+                        + deltaMs + "ms)");
+            }
+        }
+
+        lastPlaybackPositionMs = positionMs;
+        lastPlaybackUpdateMs = now;
+    }
+
+    private static long getVideoReadaheadLimitMs(long memoryLimitMs) {
+        final long stableDurationMs = SharedYouTubeSettings.SABR_VIDEO_READAHEAD_STABLE_SECONDS.get() * 1000L;
+        final boolean stable = SystemClock.elapsedRealtime() - stableSinceMs >= stableDurationMs;
+        final int targetTenths = stable
+                ? SharedYouTubeSettings.SABR_VIDEO_READAHEAD_TENTHS.get()
+                : SharedYouTubeSettings.SABR_VIDEO_READAHEAD_LOW_TENTHS.get();
+        return Math.max(500L, Math.min(memoryLimitMs, targetTenths * 100L));
+    }
+
     private static final class FormatBitrate {
         double bytesPerMs;
         long receivedTime;
@@ -179,8 +221,7 @@ final class SabrReadaheadLimit {
         // Keep audio readahead governed by the existing heap safety limit. The user's
         // video target is independent and may be lower, without deleting already buffered
         // media behind the playback position.
-        final long videoLimitMs = Math.max(500L, Math.min(memoryLimitMs,
-                SharedYouTubeSettings.SABR_VIDEO_READAHEAD_TENTHS.get() * 100L));
+        final long videoLimitMs = getVideoReadaheadLimitMs(memoryLimitMs);
         final int end = offset + length;
         int position = offset;
         while (position < end) {
