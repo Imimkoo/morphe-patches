@@ -36,8 +36,10 @@ import app.morphe.extension.shared.settings.SharedYouTubeSettings;
 final class SabrReadaheadLimit {
     private static final int PART_MEDIA_HEADER = 20;
     private static final int PART_NEXT_REQUEST_POLICY = 35;
+    private static final int PART_MEDIA_END = 22;
     private static final int PART_FORMAT_INITIALIZATION_METADATA = 42;
 
+    private static final int MEDIA_HEADER_ID_FIELD = 1;
     private static final int MEDIA_HEADER_ITAG_FIELD = 3;
     private static final int MEDIA_HEADER_START_MS_FIELD = 11;
     private static final int MEDIA_HEADER_TIME_RANGE_FIELD = 15;
@@ -90,10 +92,21 @@ final class SabrReadaheadLimit {
     private static final Map<Integer, FormatBitrate> bitrates = new HashMap<>();
     /** MIME type classification supplied by SABR format initialization metadata. */
     private static final Map<Integer, Boolean> videoFormats = new HashMap<>();
+    private static final Map<Integer, PendingVideoSegment> pendingVideoSegments = new HashMap<>();
     private static final Object videoBufferLock = new Object();
     private static int activeVideoItag = -1;
     private static long furthestBufferedVideoEndMs = -1;
     private static boolean holdingVideoRequests;
+
+    private static final class PendingVideoSegment {
+        final int itag;
+        final long endTimeMs;
+
+        PendingVideoSegment(int itag, long endTimeMs) {
+            this.itag = itag;
+            this.endTimeMs = endTimeMs;
+        }
+    }
 
     private static long lastLoggedLimitMs;
 
@@ -110,6 +123,7 @@ final class SabrReadaheadLimit {
             activeVideoItag = -1;
             furthestBufferedVideoEndMs = -1;
             holdingVideoRequests = false;
+            pendingVideoSegments.clear();
         }
     }
 
@@ -183,8 +197,10 @@ final class SabrReadaheadLimit {
                         onMediaHeader(part);
                     } else if (partType == PART_FORMAT_INITIALIZATION_METADATA) {
                         onFormatInitializationMetadata(part);
+                    } else if (partType == PART_MEDIA_END) {
+                        onMediaEnd(part);
                     }
-                }, PART_MEDIA_HEADER, PART_FORMAT_INITIALIZATION_METADATA));
+                }, PART_MEDIA_HEADER, PART_FORMAT_INITIALIZATION_METADATA, PART_MEDIA_END));
     }
 
     static void onResponseChunk(Object callbacks, ByteBuffer chunk) {
@@ -203,6 +219,7 @@ final class SabrReadaheadLimit {
     private static void onMediaHeader(byte[] part) {
         try {
             CodedInputStream input = CodedInputStream.newInstance(part);
+            int headerId = -1;
             int itag = -1;
             long startTimeMs = -1;
             long durationMs = 0;
@@ -211,6 +228,7 @@ final class SabrReadaheadLimit {
             int tag;
             while ((tag = input.readTag()) != 0) {
                 switch (WireFormat.getTagFieldNumber(tag)) {
+                    case MEDIA_HEADER_ID_FIELD -> headerId = input.readInt32();
                     case MEDIA_HEADER_ITAG_FIELD -> itag = input.readInt32();
                     case MEDIA_HEADER_START_MS_FIELD -> startTimeMs = input.readInt64();
                     case MEDIA_HEADER_DURATION_MS_FIELD -> durationMs = input.readInt64();
@@ -260,19 +278,33 @@ final class SabrReadaheadLimit {
             synchronized (videoFormats) {
                 isVideo = Boolean.TRUE.equals(videoFormats.get(itag));
             }
-            if (isVideo && startTimeMs >= 0) {
-                final long segmentEndMs = startTimeMs + durationMs;
+            if (isVideo && headerId >= 0 && startTimeMs >= 0) {
                 synchronized (videoBufferLock) {
-                    if (activeVideoItag != itag) {
-                        activeVideoItag = itag;
-                        furthestBufferedVideoEndMs = segmentEndMs;
-                    } else {
-                        furthestBufferedVideoEndMs = Math.max(furthestBufferedVideoEndMs, segmentEndMs);
-                    }
+                    pendingVideoSegments.put(headerId, new PendingVideoSegment(itag, startTimeMs + durationMs));
                 }
             }
         } catch (IOException ex) {
             Logger.printInfo(() -> "Could not read media header", ex);
+        }
+    }
+
+    /** A media segment is counted only after its UMP MEDIA_END marker arrives. */
+    private static void onMediaEnd(byte[] part) {
+        if (part.length == 0) {
+            return;
+        }
+        final int headerId = part[0] & 0xFF;
+        synchronized (videoBufferLock) {
+            PendingVideoSegment segment = pendingVideoSegments.remove(headerId);
+            if (segment == null) {
+                return;
+            }
+            if (activeVideoItag != segment.itag) {
+                activeVideoItag = segment.itag;
+                furthestBufferedVideoEndMs = segment.endTimeMs;
+            } else {
+                furthestBufferedVideoEndMs = Math.max(furthestBufferedVideoEndMs, segment.endTimeMs);
+            }
         }
     }
 
