@@ -111,6 +111,8 @@ public class SharedYouTubeSettings extends BaseSettings {
 
     // Spoof video streams
     public static final BooleanSetting SPOOF_VIDEO_STREAMS = new BooleanSetting("morphe_spoof_video_streams", TRUE, true, "morphe_spoof_video_streams_user_dialog_message");
+    /** Maximum video readahead requested by SABR, in tenths of a second. */
+    public static final IntegerSetting SABR_VIDEO_READAHEAD_TENTHS = new IntegerSetting("morphe_sabr_video_readahead_tenths", 30, true, parent(SPOOF_VIDEO_STREAMS));
     public static final BooleanSetting SPOOF_VIDEO_STREAMS_STATS_FOR_NERDS = new BooleanSetting("morphe_spoof_video_streams_stats_for_nerds", TRUE, parent(SPOOF_VIDEO_STREAMS));
     public static final EnumSetting<JavaScriptVariant> SPOOF_VIDEO_STREAMS_PLAYER_JS_VARIANT = new EnumSetting<>("morphe_spoof_video_streams_player_js_variant", JavaScriptVariant.HOUSE_BRAND, true, new JavaScriptClientAvailability());
     public static final StringSetting SPOOF_VIDEO_STREAMS_PLAYER_JS_HASH_VALUE = new StringSetting("morphe_spoof_video_streams_player_js_hash_value", "", true, false);
@@ -165,6 +167,9 @@ public class SharedYouTubeSettings extends BaseSettings {
     private static final EnumSetting<SplashScreenAnimationStyle> DEPRECATED_SPLASH_SCREEN_ANIMATION_STYLE = new EnumSetting<>("morphe_splash_screen_animation_style", SplashScreenAnimationStyle.FPS_60_ONE_SECOND);
 
     static {
+        SeekBarPreference.register(new SeekBarConfig(SABR_VIDEO_READAHEAD_TENTHS,
+                5, 300, 5, "s", 10));
+
         SeekBarPreference.register(new SeekBarConfig(SETTINGS_NEW_INDICATOR_DAYS,
                 0, 14, 1, "", 1, sf("morphe_settings_new_indicator_days_off"), null));
 
