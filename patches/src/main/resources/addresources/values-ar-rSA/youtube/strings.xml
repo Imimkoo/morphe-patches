@@ -1724,6 +1724,8 @@ AVC (H.264)
   <string name="morphe_spoof_video_streams_about_720p_max">• قد تكون الجودة محدودة بدقة 720p</string>
   <string name="morphe_spoof_video_streams_player_js_variant_title">متغير JavaScript الخاص بالمشغل</string>
   <string name="morphe_spoof_video_streams_stats_for_nerds_title">عرض التمويه في \'إحصاءات تقنية\'</string>
+  <string name="morphe_sabr_video_readahead_tenths_title">الحد المستهدف لبفر الفيديو عبر SABR</string>
+  <string name="morphe_sabr_video_readahead_tenths_summary">أقصى مدة تحميل للفيديو أمام موضع التشغيل لعملاء SABR (من 0.5 إلى 30 ثانية). لا يغيّر بفر الصوت.</string>
   <!-- misc.fix.videoactionbar.restoreOldVideoActionBarPatch -->
   <string name="morphe_video_action_bar_layout_title">تخطيط شريط إجراءات الفيديو</string>
   <string name="morphe_video_action_bar_layout_entry_1">الافتراضي</string>
