@@ -1223,6 +1223,11 @@ public class Settings extends SharedYouTubeSettings {
         migrateWideSearchbarToType();
         migrateForceSystemFontToType();
         migrateForceCodecToVideoCodec();
+        // VP9 was previously exposed as a manual preference. It is no longer offered;
+        // move existing VP9 selections to AV1 when a decoder is present, otherwise Default.
+        if (VIDEO_CODEC.get() == VideoCodec.VP9) {
+            VIDEO_CODEC.save(DisableVideoCodecsPatch.getDefaultVideoCodec());
+        }
         migrateShortsFlyoutSettings();
         migrateDownloadButtonOverride();
         migrateToolbarCastButton();
