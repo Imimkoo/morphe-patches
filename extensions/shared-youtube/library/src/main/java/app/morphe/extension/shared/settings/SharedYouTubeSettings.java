@@ -179,7 +179,7 @@ public class SharedYouTubeSettings extends BaseSettings {
         SeekBarPreference.register(new SeekBarConfig(SABR_VIDEO_READAHEAD_LOW_TENTHS,
                 5, 100, 1, "s", 10));
         SeekBarPreference.register(new SeekBarConfig(SABR_VIDEO_READAHEAD_RESUME_TENTHS,
-                5, 100, 1, "s", 10));
+                1, 100, 1, "s", 10));
         SeekBarPreference.register(new SeekBarConfig(SABR_VIDEO_READAHEAD_STABLE_SECONDS,
                 5, 300, 5, "s"));
 
