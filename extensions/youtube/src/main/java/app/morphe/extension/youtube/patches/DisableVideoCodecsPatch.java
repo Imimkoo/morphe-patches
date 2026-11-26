@@ -18,6 +18,9 @@ import android.view.Display;
 import androidx.annotation.Nullable;
 
 import java.util.List;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.settings.SharedYouTubeSettings;
@@ -47,8 +50,9 @@ public class DisableVideoCodecsPatch {
     @Nullable
     private static volatile VideoCodec videoCodec;
 
-    /** Whether the current player response actually contains an AV1 video format. */
-    private static volatile boolean currentResponseHasAv1;
+    /** AV1 availability by video ID, because YouTube can load feed/Shorts responses concurrently. */
+    private static final Map<String, Boolean> responseAv1Availability =
+            Collections.synchronizedMap(new LinkedHashMap<>());
 
     private static final int[] EMPTY_ARRAY_INT = new int[0];
 
@@ -227,9 +231,25 @@ public class DisableVideoCodecsPatch {
      * Called for every player response, independently of the selected spoof client.
      * The preference must never make a client with no AV1 streams unplayable.
      */
-    public static void observeAdaptiveFormats(boolean hasAv1) {
-        currentResponseHasAv1 = hasAv1;
-        Logger.printDebug(() -> "Current player response has AV1 video format: " + hasAv1);
+    public static void observeAdaptiveFormats(@Nullable String videoId, boolean hasAv1) {
+        if (videoId == null || videoId.isEmpty()) {
+            return;
+        }
+        synchronized (responseAv1Availability) {
+            responseAv1Availability.put(videoId, hasAv1);
+            while (responseAv1Availability.size() > 50) {
+                String oldestVideoId = responseAv1Availability.keySet().iterator().next();
+                responseAv1Availability.remove(oldestVideoId);
+            }
+        }
+        Logger.printDebug(() -> "Player response AV1 availability for " + videoId + ": " + hasAv1);
+    }
+
+    private static boolean currentResponseHasAv1() {
+        final String videoId = VideoInformation.getStartingOrPlayingVideoId();
+        synchronized (responseAv1Availability) {
+            return Boolean.TRUE.equals(responseAv1Availability.get(videoId));
+        }
     }
 
     /**
@@ -237,7 +257,7 @@ public class DisableVideoCodecsPatch {
      */
     public static boolean allowVP9() {
         final VideoCodec codec = getVideoCodec();
-        final boolean av1CanBeSelected = codec == VideoCodec.AV1 && currentResponseHasAv1;
+        final boolean av1CanBeSelected = codec == VideoCodec.AV1 && currentResponseHasAv1();
         final boolean allowed = codec != VideoCodec.AVC && !av1CanBeSelected;
         if (!allowed) {
             Logger.printVerbose(() -> "VP9 not allowed");
@@ -257,7 +277,7 @@ public class DisableVideoCodecsPatch {
         // AV1 is exclusive only when the current response offers it. Some spoof clients
         // (including older VR profiles) do not receive AV1 at all; in that case keep the
         // original formats available instead of returning an empty/unplayable track list.
-        final boolean av1CanBeSelected = codec == VideoCodec.AV1 && currentResponseHasAv1;
+        final boolean av1CanBeSelected = codec == VideoCodec.AV1 && currentResponseHasAv1();
         final boolean allowed = !isVideoCodec
                 || switch (codec) {
                     case AV1 -> !av1CanBeSelected || isAv1;
