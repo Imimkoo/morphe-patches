@@ -15,6 +15,8 @@ import app.morphe.patches.shared.misc.settings.preference.NonInteractivePreferen
 import app.morphe.patches.shared.misc.settings.preference.PreferenceScreenPreference
 import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
 import app.morphe.patches.shared.misc.spoof.spoofVideoStreamsPatch
+import app.morphe.patches.youtube.layout.player.buttons.addPlayerBottomButton
+import app.morphe.patches.youtube.layout.player.buttons.playerOverlayButtonsHookPatch
 import app.morphe.patches.youtube.misc.extension.hooks.YouTubeApplicationInitFingerprint
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
 import app.morphe.patches.youtube.misc.playservice.is_20_31_or_greater
@@ -57,7 +59,8 @@ val spoofVideoStreamsPatch = spoofVideoStreamsPatch(
             userAgentClientSpoofPatch,
             settingsPatch,
             versionCheckPatch,
-            videoInformationPatch
+            videoInformationPatch,
+            playerOverlayButtonsHookPatch
         )
     },
 
@@ -111,5 +114,7 @@ val spoofVideoStreamsPatch = spoofVideoStreamsPatch(
                 )
             )
         )
+
+        addPlayerBottomButton("Lapp/morphe/extension/youtube/videoplayer/IbrahimVideoControlButton;")
     }
 )
