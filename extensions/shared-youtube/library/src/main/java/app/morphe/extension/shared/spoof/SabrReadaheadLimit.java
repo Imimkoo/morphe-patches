@@ -159,15 +159,23 @@ final class SabrReadaheadLimit {
         getVideoReadaheadLimitMs(getReadaheadLimitMs());
     }
 
-    private static long getVideoReadaheadLimitMs(long memoryLimitMs) {
+    static long getConfiguredVideoTargetMs() {
         final long stableDurationMs = SharedYouTubeSettings.SABR_VIDEO_READAHEAD_STABLE_SECONDS.get() * 1000L;
         final boolean stable = SystemClock.elapsedRealtime() - stableSinceMs >= stableDurationMs;
         final int targetTenths = stable
                 ? SharedYouTubeSettings.SABR_VIDEO_READAHEAD_TENTHS.get()
                 : SharedYouTubeSettings.SABR_VIDEO_READAHEAD_LOW_TENTHS.get();
-        final long targetMs = Math.max(500L, Math.min(memoryLimitMs, targetTenths * 100L));
+        return Math.max(500L, targetTenths * 100L);
+    }
+
+    static long getConfiguredVideoResumeMs(long targetMs) {
         final long configuredResumeMs = SharedYouTubeSettings.SABR_VIDEO_READAHEAD_RESUME_TENTHS.get() * 100L;
-        final long resumeMs = Math.max(100L, Math.min(configuredResumeMs, targetMs - 100L));
+        return Math.max(100L, Math.min(configuredResumeMs, targetMs - 100L));
+    }
+
+    private static long getVideoReadaheadLimitMs(long memoryLimitMs) {
+        final long targetMs = Math.max(500L, Math.min(memoryLimitMs, getConfiguredVideoTargetMs()));
+        final long resumeMs = getConfiguredVideoResumeMs(targetMs);
 
         synchronized (videoBufferLock) {
             if (lastPlaybackPositionMs >= 0 && furthestBufferedVideoEndMs >= 0) {
