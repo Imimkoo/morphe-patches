@@ -28,6 +28,7 @@ import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.patches.BaseVideoInformation;
 import app.morphe.extension.shared.patches.ExoPlayerInterface;
 import app.morphe.extension.shared.patches.components.ContextInterface;
+import app.morphe.extension.youtube.patches.spoof.SpoofVideoStreamsPatch;
 import app.morphe.extension.youtube.patches.originaltitles.RestoreOriginalTitlesPatch;
 import app.morphe.extension.youtube.patches.playback.speed.RememberPlaybackSpeedPatch;
 import app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch;
@@ -304,6 +305,7 @@ public final class VideoInformation extends BaseVideoInformation {
     public static void initialize(PlaybackController playerController) {
         try {
             Logger.printDebug(() -> "newVideoStarted");
+            SpoofVideoStreamsPatch.onPlaybackStarted();
 
             WeakReference<PlaybackController> playerControllerRef =
                     new WeakReference<>(Objects.requireNonNull(playerController));
@@ -337,6 +339,11 @@ public final class VideoInformation extends BaseVideoInformation {
         } catch (Exception ex) {
             Logger.printException(() -> "initialize failure", ex);
         }
+    }
+
+    /** Called about once per second with the current playback position. */
+    public static void videoTimeChanged(long positionMs) {
+        SpoofVideoStreamsPatch.onPlaybackTime(positionMs);
     }
 
     /**
