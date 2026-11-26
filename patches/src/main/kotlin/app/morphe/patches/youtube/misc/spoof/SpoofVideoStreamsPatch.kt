@@ -91,6 +91,11 @@ val spoofVideoStreamsPatch = spoofVideoStreamsPatch(
                     SwitchPreference("morphe_spoof_video_streams_av1", summary = true),
                     ListPreference("morphe_spoof_video_streams_player_js_variant"),
                     SwitchPreference("morphe_spoof_video_streams_stats_for_nerds"),
+                    NonInteractivePreference(
+                        key = "morphe_sabr_video_readahead_tenths",
+                        tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
+                        dependency = "morphe_spoof_video_streams"
+                    ),
                 )
             )
         )
