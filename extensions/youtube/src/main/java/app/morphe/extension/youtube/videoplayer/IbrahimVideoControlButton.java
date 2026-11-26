@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -71,6 +72,9 @@ public final class IbrahimVideoControlButton {
         content.setOrientation(LinearLayout.VERTICAL);
         int horizontal = dp(context, 22);
         content.setPadding(horizontal, dp(context, 8), horizontal, dp(context, 4));
+        ScrollView scrollView = new ScrollView(context);
+        scrollView.setFillViewport(false);
+        scrollView.addView(content);
 
         String videoId = VideoInformation.getStartingOrPlayingVideoId();
         boolean sabrActive = videoId != null && !videoId.isEmpty()
@@ -94,7 +98,7 @@ public final class IbrahimVideoControlButton {
 
         new AlertDialog.Builder(context)
                 .setTitle("إعدادات إبراهيم للفيديو")
-                .setView(content)
+                .setView(scrollView)
                 .setNegativeButton("إلغاء", null)
                 .setPositiveButton("حفظ", (dialog, which) -> {
                     Settings.SABR_VIDEO_READAHEAD_TENTHS.save(pending[0]);
