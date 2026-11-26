@@ -112,6 +112,7 @@ public class SharedYouTubeSettings extends BaseSettings {
     // Spoof video streams
     public static final BooleanSetting SPOOF_VIDEO_STREAMS = new BooleanSetting("morphe_spoof_video_streams", TRUE, true, "morphe_spoof_video_streams_user_dialog_message");
     /** Maximum video readahead requested by SABR, in tenths of a second. */
+    public static final BooleanSetting IBRAHIM_WELCOME_SHOWN = new BooleanSetting("morphe_ibrahim_welcome_shown", FALSE, false, false);
     public static final IntegerSetting SABR_VIDEO_READAHEAD_TENTHS = new IntegerSetting("morphe_sabr_video_readahead_tenths", 30, true, parent(SPOOF_VIDEO_STREAMS));
     /** Lower video target used after seeking or rapid navigation, in tenths of a second. */
     public static final IntegerSetting SABR_VIDEO_READAHEAD_LOW_TENTHS = new IntegerSetting("morphe_sabr_video_readahead_low_tenths", 10, true, parent(SPOOF_VIDEO_STREAMS));
