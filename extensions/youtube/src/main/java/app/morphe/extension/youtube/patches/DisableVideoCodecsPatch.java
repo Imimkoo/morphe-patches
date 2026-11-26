@@ -18,9 +18,6 @@ import android.view.Display;
 import androidx.annotation.Nullable;
 
 import java.util.List;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.settings.SharedYouTubeSettings;
@@ -49,10 +46,6 @@ public class DisableVideoCodecsPatch {
      */
     @Nullable
     private static volatile VideoCodec videoCodec;
-
-    /** AV1 availability by video ID, because YouTube can load feed/Shorts responses concurrently. */
-    private static final Map<String, Boolean> responseAv1Availability =
-            Collections.synchronizedMap(new LinkedHashMap<>());
 
     private static final int[] EMPTY_ARRAY_INT = new int[0];
 
@@ -227,29 +220,9 @@ public class DisableVideoCodecsPatch {
         return codec;
     }
 
-    /**
-     * Called for every player response, independently of the selected spoof client.
-     * The preference must never make a client with no AV1 streams unplayable.
-     */
-    public static void observeAdaptiveFormats(@Nullable String videoId, boolean hasAv1) {
-        if (videoId == null || videoId.isEmpty()) {
-            return;
-        }
-        synchronized (responseAv1Availability) {
-            responseAv1Availability.put(videoId, hasAv1);
-            while (responseAv1Availability.size() > 50) {
-                String oldestVideoId = responseAv1Availability.keySet().iterator().next();
-                responseAv1Availability.remove(oldestVideoId);
-            }
-        }
-        Logger.printDebug(() -> "Player response AV1 availability for " + videoId + ": " + hasAv1);
-    }
-
     private static boolean currentResponseHasAv1() {
         final String videoId = VideoInformation.getStartingOrPlayingVideoId();
-        synchronized (responseAv1Availability) {
-            return Boolean.TRUE.equals(responseAv1Availability.get(videoId));
-        }
+        return app.morphe.extension.shared.patches.VideoFormat.hasAv1VideoFormat(videoId);
     }
 
     /**
