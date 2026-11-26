@@ -15,6 +15,7 @@ import java.util.Locale;
 
 import app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch;
 import app.morphe.extension.shared.spoof.requests.StreamingDataRequest;
+import app.morphe.extension.youtube.patches.DisableVideoCodecsPatch;
 import app.morphe.extension.youtube.patches.VideoInformation;
 import app.morphe.extension.youtube.patches.VideoInformation.VideoQualityInterface;
 import app.morphe.extension.youtube.settings.Settings;
@@ -151,7 +152,11 @@ public final class IbrahimVideoControlButton {
                     + "\\nبيانات SABR المستلمة: " + formatDataSize(receivedBytes)
                     + " (تشمل ترويسات النقل).";
         } else if (exoPlayerActive) {
-            engineStatus += "\\n\\nتفاصيل الترميز وحجم البيانات غير متاحة من واجهة ExoPlayer الحالية.";
+            boolean av1Available = app.morphe.extension.shared.patches.VideoFormat.hasAv1VideoFormat(videoId);
+            String preference = DisableVideoCodecsPatch.getVideoCodec().name();
+            engineStatus += "\\n\\nتفضيل الترميز: " + preference
+                    + "\\nوجود مسار AV1 في استجابة الفيديو: " + (av1Available ? "متاح" : "غير موجود/لم يُكتشف")
+                    + "\\nتفاصيل الترميز الفعلي وحجم البيانات غير متاحة من واجهة ExoPlayer الحالية.";
         }
         status.setText(engineStatus);
         status.setTextSize(13);
