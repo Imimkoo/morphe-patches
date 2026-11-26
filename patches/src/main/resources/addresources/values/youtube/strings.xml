@@ -2012,6 +2012,7 @@ Limitations:
 • HDR still depends on the spoof video streams client"</string>
     <string name="morphe_video_codec_title">Video codec</string>
     <string name="morphe_video_codec_entry_default">Default</string>
+    <string name="morphe_video_codec_entry_av1" translatable="false">AV1 (preferred)</string>
     <string name="morphe_video_codec_entry_vp9" translatable="false">VP9</string>
     <string name="morphe_video_codec_entry_avc" translatable="false">AVC (H.264)</string>
     <!-- 'Spoof video streams' should be the same translation used for 'morphe_spoof_video_streams_screen_title'. -->
