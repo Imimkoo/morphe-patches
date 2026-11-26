@@ -92,7 +92,9 @@ final class SabrReadaheadLimit {
     private static final Map<Integer, FormatBitrate> bitrates = new HashMap<>();
     /** MIME type classification supplied by SABR format initialization metadata. */
     private static final Map<Integer, Boolean> videoFormats = new HashMap<>();
-    private static final Map<Integer, PendingVideoSegment> pendingVideoSegments = new HashMap<>();
+    private static final Map<Object, Map<Integer, PendingVideoSegment>> pendingVideoSegments =
+            Collections.synchronizedMap(new WeakHashMap<>());
+    private static volatile long playbackGeneration;
     private static final Object videoBufferLock = new Object();
     private static int activeVideoItag = -1;
     private static long furthestBufferedVideoEndMs = -1;
@@ -101,10 +103,12 @@ final class SabrReadaheadLimit {
     private static final class PendingVideoSegment {
         final int itag;
         final long endTimeMs;
+        final long generation;
 
-        PendingVideoSegment(int itag, long endTimeMs) {
+        PendingVideoSegment(int itag, long endTimeMs, long generation) {
             this.itag = itag;
             this.endTimeMs = endTimeMs;
+            this.generation = generation;
         }
     }
 
@@ -119,11 +123,15 @@ final class SabrReadaheadLimit {
         lastPlaybackPositionMs = -1;
         lastPlaybackUpdateMs = -1;
         stableSinceMs = SystemClock.elapsedRealtime();
+        playbackGeneration++;
+        responseReaders.clear();
+        synchronized (pendingVideoSegments) {
+            pendingVideoSegments.clear();
+        }
         synchronized (videoBufferLock) {
             activeVideoItag = -1;
             furthestBufferedVideoEndMs = -1;
             holdingVideoRequests = false;
-            pendingVideoSegments.clear();
         }
     }
 
@@ -190,15 +198,16 @@ final class SabrReadaheadLimit {
      * @param callbacks Native callbacks of a SABR media request, which are also given the response.
      */
     static void onRequest(Object callbacks) {
+        final long requestGeneration = playbackGeneration;
         responseReaders.put(callbacks, new SabrResponseReader(
                 SabrReadaheadLimit::limitReadahead, PART_NEXT_REQUEST_POLICY,
                 (partType, part) -> {
                     if (partType == PART_MEDIA_HEADER) {
-                        onMediaHeader(part);
+                        onMediaHeader(callbacks, requestGeneration, part);
                     } else if (partType == PART_FORMAT_INITIALIZATION_METADATA) {
                         onFormatInitializationMetadata(part);
                     } else if (partType == PART_MEDIA_END) {
-                        onMediaEnd(part);
+                        onMediaEnd(callbacks, requestGeneration, part);
                     }
                 }, PART_MEDIA_HEADER, PART_FORMAT_INITIALIZATION_METADATA, PART_MEDIA_END));
     }
@@ -216,7 +225,8 @@ final class SabrReadaheadLimit {
         }
     }
 
-    private static void onMediaHeader(byte[] part) {
+    private static void onMediaHeader(Object callbacks, long generation, byte[] part) {
+        if (generation != playbackGeneration) return;
         try {
             CodedInputStream input = CodedInputStream.newInstance(part);
             int headerId = -1;
@@ -279,8 +289,11 @@ final class SabrReadaheadLimit {
                 isVideo = Boolean.TRUE.equals(videoFormats.get(itag));
             }
             if (isVideo && headerId >= 0 && startTimeMs >= 0) {
-                synchronized (videoBufferLock) {
-                    pendingVideoSegments.put(headerId, new PendingVideoSegment(itag, startTimeMs + durationMs));
+                synchronized (pendingVideoSegments) {
+                    Map<Integer, PendingVideoSegment> requestSegments =
+                            pendingVideoSegments.computeIfAbsent(callbacks, ignored -> new HashMap<>());
+                    requestSegments.put(headerId,
+                            new PendingVideoSegment(itag, startTimeMs + durationMs, generation));
                 }
             }
         } catch (IOException ex) {
@@ -289,16 +302,26 @@ final class SabrReadaheadLimit {
     }
 
     /** A media segment is counted only after its UMP MEDIA_END marker arrives. */
-    private static void onMediaEnd(byte[] part) {
-        if (part.length == 0) {
+    private static void onMediaEnd(Object callbacks, long generation, byte[] part) {
+        if (part.length == 0 || generation != playbackGeneration) {
             return;
         }
         final int headerId = part[0] & 0xFF;
-        synchronized (videoBufferLock) {
-            PendingVideoSegment segment = pendingVideoSegments.remove(headerId);
-            if (segment == null) {
+        final PendingVideoSegment segment;
+        synchronized (pendingVideoSegments) {
+            Map<Integer, PendingVideoSegment> requestSegments = pendingVideoSegments.get(callbacks);
+            if (requestSegments == null) {
                 return;
             }
+            segment = requestSegments.remove(headerId);
+            if (requestSegments.isEmpty()) {
+                pendingVideoSegments.remove(callbacks);
+            }
+        }
+        if (segment == null || segment.generation != playbackGeneration) {
+            return;
+        }
+        synchronized (videoBufferLock) {
             if (activeVideoItag != segment.itag) {
                 activeVideoItag = segment.itag;
                 furthestBufferedVideoEndMs = segment.endTimeMs;
