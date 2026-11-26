@@ -27,6 +27,7 @@ import app.morphe.patches.youtube.misc.playservice.versionCheckPatch
 import app.morphe.patches.youtube.misc.settings.PreferenceScreen
 import app.morphe.patches.youtube.misc.settings.settingsPatch
 import app.morphe.patches.youtube.video.information.videoInformationPatch
+import app.morphe.patches.youtube.video.buffer.playbackBufferPatch
 import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 import app.morphe.patches.youtube.shared.YouTubeActivityOnCreateFingerprint
 
@@ -60,6 +61,7 @@ val spoofVideoStreamsPatch = spoofVideoStreamsPatch(
             settingsPatch,
             versionCheckPatch,
             videoInformationPatch,
+            playbackBufferPatch,
             playerOverlayButtonsHookPatch
         )
     },
