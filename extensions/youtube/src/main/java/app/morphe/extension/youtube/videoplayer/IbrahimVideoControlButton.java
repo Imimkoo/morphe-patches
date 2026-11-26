@@ -77,9 +77,12 @@ public final class IbrahimVideoControlButton {
                 && StreamingDataRequest.playerClientUsesSABR(videoId);
 
         TextView status = new TextView(context);
+        boolean exoPlayerActive = VideoInformation.isExoPlayerInitialized();
         status.setText(sabrActive
                 ? "المسار الحالي يستخدم SABR — التحكم في بفر الفيديو نشط."
-                : "المسار الحالي ليس SABR. إعدادات البفر هنا محفوظة، لكنها لن تتحكم في هذا المسار حتى يكتمل ربطه.");
+                : exoPlayerActive
+                        ? "المسار الحالي يستخدم ExoPlayer — التحكم في بفر الفيديو نشط."
+                        : "لم يتم التعرف على محرك البث الحالي؛ إعدادات البفر محفوظة لكن تطبيقها غير مؤكد.");
         status.setTextSize(13);
         status.setPadding(0, 0, 0, dp(context, 12));
         content.addView(status);
