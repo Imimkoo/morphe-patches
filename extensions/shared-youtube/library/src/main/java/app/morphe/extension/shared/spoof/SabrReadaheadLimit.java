@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 import app.morphe.extension.shared.Logger;
+import app.morphe.extension.shared.settings.SharedYouTubeSettings;
 
 /**
  * Limits how much media SABR streams buffer ahead of the playback position.
@@ -174,7 +175,12 @@ final class SabrReadaheadLimit {
      * Protobuf varints can have extra empty groups, and parsers accept them.
      */
     private static void limitReadahead(ByteBuffer chunk, int offset, int length) {
-        final long limitMs = getReadaheadLimitMs();
+        final long memoryLimitMs = getReadaheadLimitMs();
+        // Keep audio readahead governed by the existing heap safety limit. The user's
+        // video target is independent and may be lower, without deleting already buffered
+        // media behind the playback position.
+        final long videoLimitMs = Math.max(500L, Math.min(memoryLimitMs,
+                SharedYouTubeSettings.SABR_VIDEO_READAHEAD_TENTHS.get() * 100L));
         final int end = offset + length;
         int position = offset;
         while (position < end) {
@@ -205,20 +211,24 @@ final class SabrReadaheadLimit {
                             break;
                         }
                     }
-                    if ((fieldNumber == POLICY_TARGET_AUDIO_READAHEAD_MS_FIELD
-                            || fieldNumber == POLICY_TARGET_VIDEO_READAHEAD_MS_FIELD) && value > limitMs) {
+                    final long fieldLimitMs = fieldNumber == POLICY_TARGET_VIDEO_READAHEAD_MS_FIELD
+                            ? videoLimitMs
+                            : fieldNumber == POLICY_TARGET_AUDIO_READAHEAD_MS_FIELD ? memoryLimitMs : Long.MAX_VALUE;
+                    if (fieldLimitMs != Long.MAX_VALUE && value > fieldLimitMs) {
                         final int valueSize = position - valueStart;
-                        long written = limitMs;
+                        long written = fieldLimitMs;
                         for (int i = 0; i < valueSize; i++) {
                             final int group = (int) (written & 0x7F);
                             written >>>= 7;
                             chunk.put(valueStart + i, (byte) (i < valueSize - 1 ? group | 0x80 : group));
                         }
                         // The limit follows the bitrate, so it is logged only when it changes much.
-                        if (Math.abs(limitMs - lastLoggedLimitMs) > lastLoggedLimitMs / 4) {
-                            lastLoggedLimitMs = limitMs;
+                        if (Math.abs(fieldLimitMs - lastLoggedLimitMs) > lastLoggedLimitMs / 4) {
+                            lastLoggedLimitMs = fieldLimitMs;
                             final long serverMs = value;
-                            Logger.printDebug(() -> "Limiting SABR readahead from " + serverMs + "ms to " + limitMs + "ms");
+                            Logger.printDebug(() -> "Limiting SABR "
+                                    + (fieldNumber == POLICY_TARGET_VIDEO_READAHEAD_MS_FIELD ? "video" : "audio")
+                                    + " readahead from " + serverMs + "ms to " + fieldLimitMs + "ms");
                         }
                     }
                 }
