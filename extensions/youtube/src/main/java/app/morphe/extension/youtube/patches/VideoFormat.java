@@ -36,7 +36,8 @@ public final class VideoFormat {
         for (FormatInterface format : adaptiveFormats) {
             try {
                 String mimeType = format.patch_getMimeType();
-                if (mimeType != null && mimeType.regionMatches(true, 0, "video/av01", 0, 10)) {
+                if (mimeType != null && mimeType.regionMatches(true, 0, "video/", 0, 6)
+                        && mimeType.toLowerCase(java.util.Locale.ROOT).contains("av01")) {
                     hasAv1 = true;
                     break;
                 }
