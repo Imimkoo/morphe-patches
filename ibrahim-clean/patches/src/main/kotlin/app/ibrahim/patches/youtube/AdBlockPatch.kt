@@ -2,10 +2,15 @@ package app.ibrahim.patches.youtube
 
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.InstructionLocation.MatchAfterImmediately
+import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.fieldAccess
 import app.morphe.patcher.methodCall
+import app.morphe.patcher.resource.ResourceType
+import app.morphe.patcher.resourceLiteral
+import app.morphe.patcher.string
 import app.morphe.patcher.opcode
 import app.morphe.patcher.patch.patch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
@@ -15,6 +20,8 @@ import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
 private const val EXTENSION_CLASS = "Lapp/ibrahim/youtube/IbrahimAds;"
 private const val SLOT_EXPIRATION_TRIGGER_CATEGORY = 6
@@ -46,6 +53,77 @@ internal object PlayerBytesAdSchedulingFingerprint : Fingerprint(
     accessFlags = listOf(AccessFlags.PUBLIC),
     returnType = "Lj$/util/Optional;",
     parameters = listOf("L", "L", "Ljava/lang/String;")
+)
+
+
+// Additional UI-ad fingerprints from the original Hide Ads implementation.
+// These are kept local to the standalone Ibrahim bundle.
+private val ADD_METHOD_CALL = methodCall(
+    opcode = Opcode.INVOKE_VIRTUAL,
+    name = "add",
+    parameters = listOf("Ljava/lang/Object;"),
+    returnType = "Z"
+)
+
+internal object FullScreenEngagementAdContainerFingerprint : Fingerprint(
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "V",
+    parameters = emptyList(),
+    filters = listOf(
+        resourceLiteral(ResourceType.ID, "fullscreen_engagement_ad_container"),
+        opcode(Opcode.IGET_BOOLEAN),
+        ADD_METHOD_CALL,
+        ADD_METHOD_CALL,
+        methodCall(
+            opcode = Opcode.INVOKE_VIRTUAL,
+            name = "size",
+            parameters = emptyList(),
+            returnType = "I"
+        )
+    )
+)
+
+internal object GetPremiumViewFingerprint : Fingerprint(
+    definingClass = "Lcom/google/android/apps/youtube/app/red/presenter/CompactYpcOfferModuleView;",
+    name = "onMeasure",
+    accessFlags = listOf(AccessFlags.PROTECTED, AccessFlags.FINAL),
+    returnType = "V",
+    parameters = listOf("I", "I"),
+    filters = listOf(
+        methodCall(
+            opcode = Opcode.INVOKE_VIRTUAL,
+            definingClass = "this",
+            name = "setMeasuredDimension",
+            parameters = listOf("I", "I"),
+            returnType = "V"
+        ),
+        opcode(Opcode.RETURN_VOID, app.morphe.patcher.InstructionLocation.MatchAfterImmediately())
+    )
+)
+
+internal object PlayerOverlayTimelyShelfFingerprint : Fingerprint(
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "V",
+    parameters = listOf("Ljava/lang/Object;"),
+    filters = listOf(
+        string("player_overlay_timely_shelf"),
+        methodCall(
+            smali = "Ljava/lang/String;->equals(Ljava/lang/Object;)Z",
+            location = app.morphe.patcher.InstructionLocation.MatchAfterWithin(5)
+        ),
+        opcode(
+            Opcode.MOVE_RESULT,
+            app.morphe.patcher.InstructionLocation.MatchAfterImmediately()
+        )
+    )
+)
+
+internal object MiniplayerPaidPromotionLabelFingerprint : Fingerprint(
+    filters = listOf(
+        resourceLiteral(ResourceType.ID, "modern_miniplayer_subtitle_text"),
+        opcode(Opcode.INVOKE_VIRTUAL, app.morphe.patcher.InstructionLocation.MatchAfterImmediately()),
+        opcode(Opcode.MOVE_RESULT_OBJECT, app.morphe.patcher.InstructionLocation.MatchAfterImmediately())
+    )
 )
 
 val ibrahimYouTubeAdBlockPatch = patch(
@@ -130,6 +208,63 @@ val ibrahimYouTubeAdBlockPatch = patch(
                 move-result-object v0
                 return-object v0
                 :show_video_ads
+                nop
+            """
+        )
+        
+        // Hide the original full-screen engagement ad container.
+        FullScreenEngagementAdContainerFingerprint.method.addInstructionsWithLabels(
+            0,
+            """
+                invoke-static {}, $EXTENSION_CLASS->hideGeneralAds()Z
+                move-result v0
+                if-eqz v0, :keep_engagement_container
+                return-void
+                :keep_engagement_container
+                nop
+            """
+        )
+
+        // Remove the Premium promotion view by giving it zero measured dimensions.
+        GetPremiumViewFingerprint.let { fingerprint ->
+            val match = fingerprint.instructionMatches.first()
+            val index = match.index
+            val instruction = fingerprint.method.getInstruction<FiveRegisterInstruction>(index)
+            val widthRegister = instruction.registerC
+            val heightRegister = instruction.registerD
+            fingerprint.method.addInstructionsWithLabels(
+                index,
+                """
+                    invoke-static {}, $EXTENSION_CLASS->hideGeneralAds()Z
+                    move-result v0
+                    if-eqz v0, :keep_premium_promotion
+                    const/4 v$widthRegister, 0x0
+                    const/4 v$heightRegister, 0x0
+                    :keep_premium_promotion
+                    nop
+                """
+            )
+        }
+
+        // Hide the miniplayer paid-promotion label.
+        MiniplayerPaidPromotionLabelFingerprint.let { fingerprint ->
+            val match = fingerprint.instructionMatches.last()
+            val viewRegister = fingerprint.method.getInstruction<OneRegisterInstruction>(match.index).registerA
+            fingerprint.method.addInstruction(
+                match.index + 1,
+                "invoke-static { v$viewRegister }, $EXTENSION_CLASS->hideView(Landroid/view/View;)V"
+            )
+        }
+
+        // Remove the ad shelf in the player overlay.
+        PlayerOverlayTimelyShelfFingerprint.method.addInstructionsWithLabels(
+            0,
+            """
+                invoke-static {}, $EXTENSION_CLASS->hideGeneralAds()Z
+                move-result v0
+                if-eqz v0, :keep_player_shelf
+                return-void
+                :keep_player_shelf
                 nop
             """
         )
