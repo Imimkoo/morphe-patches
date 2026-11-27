@@ -30,6 +30,7 @@ public class DisableVideoCodecsPatch {
 
     public enum VideoCodec {
         DEFAULT,
+        AV1,
         VP9,
         AVC
     }
@@ -144,43 +145,43 @@ public class DisableVideoCodecsPatch {
     }
 
     /**
-     * @return The default codec setting, which is VP9 if the device cannot hardware decode AV1.
+     * Prefer AV1 whenever Android exposes a decoder. This intentionally includes software
+     * decoders: devices without hardware AV1 can still request AV1 and decode it in software.
      */
     public static VideoCodec getDefaultVideoCodec() {
-        return hasHardwareAv1Decoder() ? VideoCodec.DEFAULT : VideoCodec.VP9;
+        return hasAnyAv1Decoder() ? VideoCodec.AV1 : VideoCodec.DEFAULT;
     }
 
-    private static boolean hasHardwareAv1Decoder() {
-        // Android 9 and older cannot report if a decoder is hardware accelerated,
-        // and devices with a hardware AV1 decoder all ship with Android 10 or newer.
+    private static boolean hasAnyAv1Decoder() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             return false;
         }
 
         try {
             for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
-                if (info.isEncoder() || !info.isHardwareAccelerated()) {
+                if (info.isEncoder()) {
                     continue;
                 }
                 for (String type : info.getSupportedTypes()) {
                     if (MIMETYPE_VIDEO_AV1.equalsIgnoreCase(type)) {
-                        Logger.printDebug(() -> "Found hardware AV1 decoder: " + info.getName());
+                        Logger.printDebug(() -> "Found AV1 decoder: " + info.getName()
+                                + ", hardware=" + info.isHardwareAccelerated());
                         return true;
                     }
                 }
             }
         } catch (Exception ex) {
-            Logger.printException(() -> "hasHardwareAv1Decoder failure", ex);
+            Logger.printException(() -> "AV1 decoder detection failed", ex);
         }
 
-        Logger.printDebug(() -> "No hardware AV1 decoder found");
+        Logger.printDebug(() -> "No Android AV1 decoder reported");
         return false;
     }
 
     private static VideoCodec resolveVideoCodec() {
         VideoCodec codec = Settings.VIDEO_CODEC.get();
         if (codec == VideoCodec.AVC && !isAvcAvailable()) {
-            return VideoCodec.VP9;
+            return hasAnyAv1Decoder() ? VideoCodec.AV1 : VideoCodec.VP9;
         }
         return codec;
     }
@@ -197,11 +198,18 @@ public class DisableVideoCodecsPatch {
         return codec;
     }
 
+    private static boolean currentResponseHasAv1() {
+        final String videoId = VideoInformation.getStartingOrPlayingVideoId();
+        return app.morphe.extension.shared.patches.VideoFormat.hasAv1VideoFormat(videoId);
+    }
+
     /**
      * Injection point.
      */
     public static boolean allowVP9() {
-        final boolean allowed = getVideoCodec() != VideoCodec.AVC;
+        final VideoCodec codec = getVideoCodec();
+        final boolean av1CanBeSelected = codec == VideoCodec.AV1 && currentResponseHasAv1();
+        final boolean allowed = codec != VideoCodec.AVC && !av1CanBeSelected;
         if (!allowed) {
             Logger.printVerbose(() -> "VP9 not allowed");
         }
@@ -212,9 +220,23 @@ public class DisableVideoCodecsPatch {
      * Injection point.
      */
     public static boolean allowCodec(String mimeType) {
-        final boolean allowed = !(getVideoCodec() == VideoCodec.VP9 && MIMETYPE_VIDEO_AV1.equals(mimeType));
+        final VideoCodec codec = getVideoCodec();
+        final boolean isVideoCodec = mimeType != null
+                && mimeType.regionMatches(true, 0, "video/", 0, 6);
+        final boolean isAv1 = mimeType != null
+                && mimeType.toLowerCase(java.util.Locale.ROOT).contains("av01");
+
+        // Keep audio and non-video MIME types untouched. Prefer AV1 exclusively only when
+        // this video's player response actually contains an AV1 adaptive format.
+        final boolean av1CanBeSelected = codec == VideoCodec.AV1 && currentResponseHasAv1();
+        final boolean allowed = !isVideoCodec || switch (codec) {
+            case AV1 -> !av1CanBeSelected || isAv1;
+            case VP9, AVC -> !isAv1;
+            case DEFAULT -> true;
+        };
+
         if (!allowed) {
-            Logger.printVerbose(() -> "Codec not allowed: " + mimeType);
+            Logger.printVerbose(() -> "Codec not allowed for " + codec + ": " + mimeType);
         }
         return allowed;
     }

@@ -1,0 +1,46 @@
+name: Ibrahim AV1 and Ads MPP
+
+on:
+  push:
+    branches:
+      - ibrahim/av1-ad-only
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Cache Gradle
+        uses: burrunan/gradle-cache-action@v3
+
+      - name: Test patch sources
+        timeout-minutes: 30
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew :patches:test :extensions:youtube:testDebugUnitTest --no-daemon
+
+      - name: Build Android patch bundle
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew :patches:buildAndroid -PpatchesName="Ibrahim AV1 and Ads" --no-daemon
+
+      - name: Upload MPP
+        uses: actions/upload-artifact@v7
+        with:
+          name: Ibrahim-AV1-and-Ads-MPP
+          archive: false
+          path: patches/build/libs/*.mpp
+          if-no-files-found: error
+          retention-days: 30

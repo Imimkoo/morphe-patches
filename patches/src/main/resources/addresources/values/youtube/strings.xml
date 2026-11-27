@@ -2011,16 +2011,23 @@ Limitations:
 • HDR still depends on the spoof video streams client"</string>
     <string name="morphe_video_codec_title">Video codec</string>
     <string name="morphe_video_codec_entry_default">Default</string>
+    <string name="morphe_video_codec_entry_av1" translatable="false">AV1 (priority)</string>
     <string name="morphe_video_codec_entry_vp9" translatable="false">VP9</string>
     <string name="morphe_video_codec_entry_avc" translatable="false">AVC (H.264)</string>
     <!-- 'Spoof video streams' should be the same translation used for 'morphe_spoof_video_streams_screen_title'. -->
     <string name="morphe_video_codec_avc_not_available">To force AVC, change \'Spoof video streams\' to \'Android Studio\', \'Android VR\' or \'visionOS\'</string>
-    <string name="morphe_video_codec_user_dialog_message">"VP9
+    <string name="morphe_video_codec_user_dialog_message">"AV1 (priority)
+• Requests an AV1-capable Android XR stream client first
+• Blocks VP9 when the current video response contains AV1
+• Allows software decoding when Android reports an AV1 decoder
+• If YouTube does not provide AV1 for a video, normal formats remain available
+
+VP9
 • Can improve battery life and fix playback stuttering
 • Uses more internet data than AV1
 
 AVC (H.264)
-• Requires \'Android Studio\', \'Android VR\', or \'visionOS\' Spoof video stream client
+• Requires a compatible Spoof video stream client
 • Can improve battery life even more
 • Can restore missing video resolutions on older devices
 • Maximum resolution is 1080p

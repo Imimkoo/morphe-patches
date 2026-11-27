@@ -1847,19 +1847,26 @@ Mistral Nemo هو الخيار الأرخص، بينما توفر Gemma 4 أعل
 • يظل تشغيل HDR معتمدًا على عميل Spoof Video Streams"</string>
   <string name="morphe_video_codec_title">ترميز الفيديو</string>
   <string name="morphe_video_codec_entry_default">الافتراضي</string>
+  <string name="morphe_video_codec_entry_av1" translatable="false">AV1 (أولوية)</string>
   <!-- 'Spoof video streams' should be the same translation used for 'morphe_spoof_video_streams_screen_title'. -->
   <string name="morphe_video_codec_avc_not_available">لفرض استخدام AVC، غيّر \'Spoof Video Streams\' إلى \'Android Studio\' أو \'Android VR\' أو \'visionOS\'</string>
-  <string name="morphe_video_codec_user_dialog_message">"VP9
-• يمكن أن يحسّن عمر البطارية ويصلح تقطّع التشغيل
-• يستهلك بيانات إنترنت أكثر من AV1
+  <string name="morphe_video_codec_user_dialog_message">"AV1 (أولوية)
+• يطلب عميل Android XR القادر على AV1 أولًا
+• يمنع VP9 عندما يحتوي رد الفيديو الحالي على مسار AV1
+• يسمح بفك الترميز برمجيًا إذا أندرويد أعلن عن وحدة فك AV1
+• إذا لم يوفر YouTube مسار AV1 لفيديو معين، يظل التشغيل قادرًا على استخدام الترميزات البديلة
+
+VP9
+• قد يحسّن عمر البطارية ويعالج تقطّع التشغيل
+• يستهلك بيانات أكثر من AV1
 
 AVC (H.264)
-• يتطلب Spoof Video Streams بعميل 'Android Studio' أو 'Android VR' أو 'visionOS'
-• يمكن أن يحسّن عمر البطارية أكثر
-• يمكنه استعادة دقّات الفيديو المفقودة على الأجهزة الأقدم
-• الحد الأقصى للدقة هو 1080p
+• يحتاج إلى عميل Spoof Video Streams متوافق
+• قد يحسّن عمر البطارية أكثر
+• قد يعيد دقّات فيديو مفقودة على الأجهزة الأقدم
+• الحد الأقصى للدقة 1080p
 • قد لا تستخدم فيديوهات HDR تقنية AVC
-• لا تستطيع بعض الأجهزة فرض استخدام AVC"</string>
+• لا تستطيع بعض الأجهزة فرض استخدام AVC"</string>>
   <!-- video.quality.advancedVideoQualityMenuPatch -->
   <string name="morphe_advanced_video_quality_menu_title">فتح قائمة \'الجودة المتقدمة\'</string>
   <string name="morphe_advanced_video_quality_menu_summary">يتخطى قائمة تحديد الجودة ويفتح قائمة الجودة المتقدمة مباشرة</string>
