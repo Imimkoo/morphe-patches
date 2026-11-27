@@ -1866,7 +1866,7 @@ AVC (H.264)
 • قد يعيد دقّات فيديو مفقودة على الأجهزة الأقدم
 • الحد الأقصى للدقة 1080p
 • قد لا تستخدم فيديوهات HDR تقنية AVC
-• لا تستطيع بعض الأجهزة فرض استخدام AVC"</string>>
+• لا تستطيع بعض الأجهزة فرض استخدام AVC"</string>
   <!-- video.quality.advancedVideoQualityMenuPatch -->
   <string name="morphe_advanced_video_quality_menu_title">فتح قائمة \'الجودة المتقدمة\'</string>
   <string name="morphe_advanced_video_quality_menu_summary">يتخطى قائمة تحديد الجودة ويفتح قائمة الجودة المتقدمة مباشرة</string>
