@@ -25,6 +25,15 @@ jobs:
       - name: Cache Gradle
         uses: burrunan/gradle-cache-action@v3
 
+      - name: Upload MPP
+        uses: actions/upload-artifact@v7
+        with:
+          name: Ibrahim-AV1-and-Ads-MPP
+          archive: false
+          path: patches/build/libs/*.mpp
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Test patch sources
         timeout-minutes: 30
         env:
@@ -35,12 +44,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew :patches:buildAndroid -PpatchesName="Ibrahim AV1 and Ads" --no-daemon
-
-      - name: Upload MPP
-        uses: actions/upload-artifact@v7
-        with:
-          name: Ibrahim-AV1-and-Ads-MPP
-          archive: false
-          path: patches/build/libs/*.mpp
-          if-no-files-found: error
-          retention-days: 30
