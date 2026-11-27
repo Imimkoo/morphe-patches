@@ -1,8 +1,8 @@
 package app.ibrahim.patches.youtube
 
 import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.patch.patch
-import com.android.tools.smali.dexlib2.AccessFlags
 
 private const val EXTENSION_CLASS = "Lapp/ibrahim/youtube/IbrahimAv1Support;"
 
