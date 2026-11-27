@@ -13,7 +13,6 @@ import app.morphe.patcher.resourceLiteral
 import app.morphe.patcher.string
 import app.morphe.patcher.opcode
 import app.morphe.patcher.patch.patch
-import app.morphe.patcher.registersUsed
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.ibrahim.patches.youtube.Constants
 import com.android.tools.smali.dexlib2.AccessFlags
@@ -22,6 +21,7 @@ import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 
 private const val EXTENSION_CLASS = "Lapp/ibrahim/youtube/IbrahimAds;"
 private const val SLOT_EXPIRATION_TRIGGER_CATEGORY = 6
@@ -229,8 +229,9 @@ val ibrahimYouTubeAdBlockPatch = patch(
         GetPremiumViewFingerprint.let { fingerprint ->
             val match = fingerprint.instructionMatches.first()
             val index = match.index
-            val widthRegister = match.instruction.registersUsed[1]
-            val heightRegister = match.instruction.registersUsed[2]
+            val instruction = match.instruction as FiveRegisterInstruction
+            val widthRegister = instruction.registerD
+            val heightRegister = instruction.registerE
             fingerprint.method.addInstructionsWithLabels(
                 index,
                 """
