@@ -1,0 +1,49 @@
+name: Ibrahim clean standalone MPP
+
+on:
+  push:
+    branches:
+      - ibrahim/clean-standalone-mpp
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Build only the standalone Ibrahim project
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          ./gradlew -p ibrahim-clean :patches:buildAndroid --no-daemon
+          MPP="$(find ibrahim-clean/patches/build/libs -maxdepth 1 -type f -name '*.mpp' -print -quit)"
+          test -n "$MPP" && test -s "$MPP"
+          echo "MPP=$MPP" >> "$GITHUB_ENV"
+          unzip -t "$MPP" >/dev/null
+          unzip -p "$MPP" META-INF/MANIFEST.MF | tee /tmp/mpp-manifest.txt
+          grep -E "Patcher-Version|Version|Name" /tmp/mpp-manifest.txt
+          sha256sum "$MPP" | tee ibrahim-clean/patches/build/libs/SHA256SUMS.txt
+
+      - name: Upload standalone MPP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ibrahim-youtube-clean-mpp
+          path: |
+            ibrahim-clean/patches/build/libs/*.mpp
+            ibrahim-clean/patches/build/libs/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
