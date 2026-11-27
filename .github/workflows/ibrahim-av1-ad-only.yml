@@ -25,6 +25,11 @@ jobs:
       - name: Cache Gradle
         uses: burrunan/gradle-cache-action@v3
 
+      - name: Build Android patch bundle
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew :patches:buildAndroid -PpatchesName="Ibrahim AV1 and Ads" --no-daemon
+
       - name: Upload MPP
         uses: actions/upload-artifact@v7
         with:
@@ -39,8 +44,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew :patches:test :extensions:youtube:testDebugUnitTest --no-daemon
-
-      - name: Build Android patch bundle
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew :patches:buildAndroid -PpatchesName="Ibrahim AV1 and Ads" --no-daemon
