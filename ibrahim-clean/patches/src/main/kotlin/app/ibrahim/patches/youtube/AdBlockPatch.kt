@@ -8,38 +8,29 @@ import app.morphe.patcher.fieldAccess
 import app.morphe.patcher.methodCall
 import app.morphe.patcher.opcode
 import app.morphe.patcher.patch.patch
+import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.morphe.patches.youtube.shared.Constants
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
-import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
-import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
-import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
-import app.morphe.patcher.patch.patch
 
 private const val EXTENSION_CLASS = "Lapp/ibrahim/youtube/IbrahimAds;"
-
-private val ADD_METHOD_CALL = methodCall(
-    opcode = Opcode.INVOKE_VIRTUAL,
-    name = "add",
-    parameters = listOf("Ljava/lang/Object;"),
-    returnType = "Z",
-)
+private const val SLOT_EXPIRATION_TRIGGER_CATEGORY = 6
 
 internal object PlayerBytesAdLayoutFingerprint : Fingerprint(
     returnType = "V",
     parameters = listOf("L"),
     strings = listOf(
-        "Bootstrapped layout construction resulted in non PlayerBytesLayout. PlayerAds count: ",
+        "Bootstrapped layout construction resulted in non PlayerBytesLayout. PlayerAds count: "
     )
 )
 
 internal object LoadVideoAdsFingerprint : Fingerprint(
     strings = listOf(
         "TriggerBundle doesn't have the required metadata specified by the trigger ",
-        "Ping migration no associated ping bindings for activated trigger: ",
+        "Ping migration no associated ping bindings for activated trigger: "
     ),
     filters = listOf(
         fieldAccess(opcode = Opcode.IGET, type = "I"),
@@ -54,7 +45,7 @@ internal object PlayerBytesAdSchedulingFingerprint : Fingerprint(
     classFingerprint = PlayerBytesAdLayoutFingerprint,
     accessFlags = listOf(AccessFlags.PUBLIC),
     returnType = "Lj$/util/Optional;",
-    parameters = listOf("L", "L", "Ljava/lang/String;"),
+    parameters = listOf("L", "L", "Ljava/lang/String;")
 )
 
 val ibrahimYouTubeAdBlockPatch = patch(
@@ -65,7 +56,6 @@ val ibrahimYouTubeAdBlockPatch = patch(
     extendWith("extensions/ibrahim-youtube.mpe")
 
     execute {
-        // Prevent the player-byte ad layout from being created.
         PlayerBytesAdLayoutFingerprint.method.addInstructionsWithLabels(
             0,
             """
@@ -78,8 +68,6 @@ val ibrahimYouTubeAdBlockPatch = patch(
             """
         )
 
-        // Keep only the trigger category used to expire the blocked ad slots.
-        // This mirrors the upstream ad-blocker behavior and avoids accumulating ad slots.
         LoadVideoAdsFingerprint.let { fingerprint ->
             val categoryField = fingerprint.instructionMatches.first().fieldReference
             val filterTriggersMethod = ImmutableMethod(
@@ -90,11 +78,9 @@ val ibrahimYouTubeAdBlockPatch = patch(
                 AccessFlags.PRIVATE.value or AccessFlags.STATIC.value,
                 null,
                 null,
-                MutableMethodImplementation(6),
-            ).also { immutableMethod ->
-                val mutableMethod = app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
-                    .toMutable(immutableMethod)
-                mutableMethod.addInstructionsWithLabels(
+                MutableMethodImplementation(6)
+            ).toMutable().apply {
+                addInstructionsWithLabels(
                     0,
                     """
                         invoke-static {}, $EXTENSION_CLASS->hideVideoAds()Z
@@ -104,7 +90,7 @@ val ibrahimYouTubeAdBlockPatch = patch(
                         invoke-direct { v0 }, Ljava/util/ArrayList;-><init>()V
                         invoke-interface { p0 }, Ljava/util/List;->iterator()Ljava/util/Iterator;
                         move-result-object v1
-                        const/16 v4, 0x6
+                        const/16 v4, $SLOT_EXPIRATION_TRIGGER_CATEGORY
                         :next_trigger
                         invoke-interface { v1 }, Ljava/util/Iterator;->hasNext()Z
                         move-result v2
@@ -122,8 +108,8 @@ val ibrahimYouTubeAdBlockPatch = patch(
                         return-object p0
                     """
                 )
-                fingerprint.classDef.methods.add(mutableMethod)
             }
+            fingerprint.classDef.methods.add(filterTriggersMethod)
 
             fingerprint.method.addInstructions(
                 0,
@@ -134,8 +120,6 @@ val ibrahimYouTubeAdBlockPatch = patch(
             )
         }
 
-        // The player waits for the ad slot future before playback begins. Return an empty
-        // future so blocking the ad slot does not leave playback waiting forever.
         PlayerBytesAdSchedulingFingerprint.method.addInstructionsWithLabels(
             0,
             """
