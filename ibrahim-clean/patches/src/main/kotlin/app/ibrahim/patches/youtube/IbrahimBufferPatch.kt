@@ -12,6 +12,7 @@ import app.morphe.patcher.opcode
 import app.morphe.patcher.patch.patch
 import app.morphe.patcher.resource.ResourceType
 import app.morphe.patcher.resourceLiteral
+import app.morphe.util.findInstructionIndicesReversedOrThrow
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
@@ -63,22 +64,19 @@ val ibrahimSmartBufferPatch = patch(
         // to request more media. Saturating it while throttled stops future loading without
         // changing the selected format, decoder, player implementation, or seek position.
         ShouldContinueLoadingFingerprint.let { fingerprint ->
-            val field = fingerprint.instructionMatches.first().fieldReference
-            val instructions = fingerprint.method.implementation.instructions
-            val indices = instructions.mapIndexedNotNull { index, instruction ->
-                val reference = (instruction as? ReferenceInstruction)?.reference
-                if (reference == field) index else null
-            }.asReversed()
-
-            indices.forEach { bufferedIndex ->
-                val register = fingerprint.method.getInstruction<TwoRegisterInstruction>(bufferedIndex).registerA
-                fingerprint.method.addInstructions(
-                    bufferedIndex + 1,
-                    """
-                        invoke-static/range { v$register .. v${register + 1} }, $BUFFER_POLICY_CLASS->apply(J)J
-                        move-result-wide v$register
-                    """
-                )
+            fingerprint.method.apply {
+                findInstructionIndicesReversedOrThrow(
+                    fieldAccess(fingerprint.instructionMatches.first().fieldReference)
+                ).forEach { bufferedIndex ->
+                    val register = getInstruction<TwoRegisterInstruction>(bufferedIndex).registerA
+                    addInstructions(
+                        bufferedIndex + 1,
+                        """
+                            invoke-static/range { v$register .. v${register + 1} }, $BUFFER_POLICY_CLASS->apply(J)J
+                            move-result-wide v$register
+                        """
+                    )
+                }
             }
         }
 
