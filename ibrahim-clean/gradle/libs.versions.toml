@@ -1,5 +1,6 @@
 [versions]
 morphe-patcher = "2.6.0"
+smali = "5a5249e22f"
 gson = "2.15.0"
 animalsniffer = "2.0.1"
 gummy-bears = "0.16.0"
